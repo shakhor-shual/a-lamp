@@ -199,7 +199,7 @@ def _run_gateway(data_dir: str):
             "channels": {
                 "websocket": {
                     "enabled": True,
-                    "host": "127.0.0.1",
+                    "host": "localhost",
                     "port": 8765,
                     "websocket_requires_token": False
                 }
@@ -207,7 +207,7 @@ def _run_gateway(data_dir: str):
             "gateway": {
                 "health": {
                     "enabled": True,
-                    "host": "127.0.0.1",
+                    "host": "localhost",
                     "port": 18790
                 },
                 "heartbeat": {
@@ -311,7 +311,7 @@ def _run_gateway(data_dir: str):
     try:
         import urllib.request
         import json as _json
-        req = urllib.request.Request("http://127.0.0.1:8765/webui/bootstrap")
+        req = urllib.request.Request("http://localhost:8765/webui/bootstrap")
         resp = urllib.request.urlopen(req, timeout=5)
         bootstrap = _json.loads(resp.read())
         log_path = os.path.join(nanobot_dir, "bootstrap_check.log")

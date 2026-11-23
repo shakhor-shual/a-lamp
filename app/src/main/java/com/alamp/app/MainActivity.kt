@@ -175,7 +175,7 @@ class MainActivity : AppCompatActivity() {
                 val resources = request.resources.joinToString()
                 Log.d("A-lamp", "onPermissionRequest origin=$origin resources=[$resources]")
 
-                if (origin != "http://127.0.0.1:8765") {
+                if (origin != "http://localhost:8765") {
                     Log.w("A-lamp", "deny — unknown origin: $origin")
                     request.deny()
                     return
@@ -220,7 +220,7 @@ class MainActivity : AppCompatActivity() {
                     if (body.contains("\"ready\": true") || body.contains("\"websocket\": \"running\"")) {
                         withContext(Dispatchers.Main) {
                             setStatus("✅ Загружаю...")
-                            webView.loadUrl("http://127.0.0.1:8765/webui/")
+                            webView.loadUrl("http://localhost:8765/webui/")
                         }
                         return@launch
                     }
