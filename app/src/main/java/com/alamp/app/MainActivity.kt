@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.MenuItem
 import android.webkit.WebView
 import androidx.appcompat.app.AlertDialog
@@ -170,7 +171,12 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPermissionRequest(request: PermissionRequest?) {
                 request ?: return
-                if (!request.origin.toString().startsWith("http://127.0.0.1:8765")) {
+                val origin = request.origin.toString()
+                val resources = request.resources.joinToString()
+                Log.d("A-lamp", "onPermissionRequest origin=$origin resources=[$resources]")
+
+                if (origin != "http://127.0.0.1:8765") {
+                    Log.w("A-lamp", "deny — unknown origin: $origin")
                     request.deny()
                     return
                 }
@@ -178,8 +184,10 @@ class MainActivity : AppCompatActivity() {
                     it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
                 }.toTypedArray()
                 if (audioResources.isNotEmpty()) {
+                    Log.d("A-lamp", "grant — audio capture for $origin")
                     request.grant(audioResources)
                 } else {
+                    Log.w("A-lamp", "deny — no audio resources in request")
                     request.deny()
                 }
             }
@@ -319,11 +327,7 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == AUDIO_PERMISSION_CODE &&
             grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            // Разрешение получено — перезагружаем WebView, чтобы сбросить кеш
-            val currentUrl = webView.url
-            if (currentUrl != null) {
-                webView.loadUrl(currentUrl)
-            }
+            Log.d("A-lamp", "RECORD_AUDIO permission granted by user")
         }
     }
 }
