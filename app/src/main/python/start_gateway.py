@@ -103,24 +103,32 @@ def _extract_vec_so(data_dir: str) -> str | None:
         return None
 
 
-def _check_embeddings(nanobot_dir: str):
+def _check_embeddings(nanobot_dir: str, vec_so_path: str | None = None):
     """Проверяет, есть ли эмбеддинги в БД, и пишет лог."""
     db_path = os.path.join(nanobot_dir, "sessions.sqlite3")
     log_path = os.path.join(nanobot_dir, "embeddings_check.log")
     try:
         import sqlite3
         conn = sqlite3.connect(db_path)
+
+        # Загружаем vec0, если есть — чтобы vec_chunks не упал с "no such module"
+        if vec_so_path and os.path.exists(vec_so_path):
+            try:
+                conn.enable_load_extension(True)
+                conn.load_extension(vec_so_path)
+                conn.enable_load_extension(False)
+            except Exception:
+                pass  # не критично для проверки
+
         cur = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         tables = [r[0] for r in cur.fetchall()]
         info = {"tables": tables}
         for t in tables:
-            cur = conn.execute(f'SELECT COUNT(*) FROM "{t}"')
-            info[t] = cur.fetchone()[0]
-        if "vec_chunks" in tables:
-            cur = conn.execute("SELECT COUNT(*) FROM vec_chunks")
-            info["vec_chunks_count"] = cur.fetchone()[0]
-            cur = conn.execute("SELECT COUNT(DISTINCT k) FROM vec_chunks")
-            info["vec_chunks_kinds"] = cur.fetchone()[0]
+            try:
+                cur = conn.execute(f'SELECT COUNT(*) FROM "{t}"')
+                info[t] = cur.fetchone()[0]
+            except Exception as e:
+                info[t] = f"ERROR: {e}"
         conn.close()
         with open(log_path, "w") as f:
             import json
@@ -145,7 +153,7 @@ def _run_gateway(data_dir: str):
     vec_path = _extract_vec_so(data_dir)
 
     # --- Проверяем, есть ли эмбеддинги в БД ---
-    _check_embeddings(nanobot_dir)
+    _check_embeddings(nanobot_dir, vec_so_path=vec_path)
 
     # --- Путь к БД (всё ещё нужен для _check_embeddings и совместимости) ---
     os.environ["MEMORY_DB_PATH"] = os.path.join(nanobot_dir, "sessions.sqlite3")

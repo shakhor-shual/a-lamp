@@ -2,11 +2,12 @@
 # Сборка alamp_memory wheel из исходников в app/src/main/python/alamp_memory/
 set -euo pipefail
 
+cd "$(dirname "$0")"
+PROJECT_ROOT="$PWD"
+
 SRC="app/src/main/python/alamp_memory"
 DIST_INFO="alamp_memory-0.1.0.dist-info"
-WHEEL_OUT="app/alamp_memory-0.1.0-py3-none-any.whl"
-
-cd "$(dirname "$0")"
+WHEEL_OUT="$PROJECT_ROOT/app/alamp_memory-0.1.0-py3-none-any.whl"
 
 # Временная директория для сборки wheel
 BUILD_DIR=$(mktemp -d)
@@ -60,6 +61,6 @@ with open('$DIST_INFO/RECORD', 'w') as f:
 "
 
 # Упаковываем wheel
-rm -f "../$WHEEL_OUT"
-zip -r "../$WHEEL_OUT" . > /dev/null
-echo "✅ Wheel собран: $WHEEL_OUT ($(du -h "../$WHEEL_OUT" | cut -f1))"
+rm -f "$WHEEL_OUT"
+zip -r "$WHEEL_OUT" . > /dev/null
+echo "✅ Wheel собран: $WHEEL_OUT ($(du -h "$WHEEL_OUT" | cut -f1))"
