@@ -38,7 +38,6 @@ class MainActivity : AppCompatActivity() {
     private var ttsEnabled = true
     private var lastChatId: String? = null
     private var gatewayCheckJob: Job? = null
-    private var pendingAudioRequest: PermissionRequest? = null
     private val AUDIO_PERMISSION_CODE = 1001
     private val healthClient = OkHttpClient.Builder()
         .connectTimeout(2, TimeUnit.SECONDS)
@@ -67,6 +66,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         setupWebView()
+        requestAudioPermission()
         startNanobotGateway()
         waitForGateway()
     }
@@ -94,6 +94,18 @@ class MainActivity : AppCompatActivity() {
             ttsBridge?.stop()
             Toast.makeText(this, "🧞 Озвучка выключена", Toast.LENGTH_SHORT).show()
             navView.menu.findItem(R.id.action_tts)?.setIcon(android.R.drawable.ic_media_pause)
+        }
+    }
+
+    private fun requestAudioPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                AUDIO_PERMISSION_CODE
+            )
         }
     }
 
@@ -165,22 +177,10 @@ class MainActivity : AppCompatActivity() {
                 val audioResources = request.resources.filter {
                     it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
                 }.toTypedArray()
-                if (audioResources.isEmpty()) {
-                    request.deny()
-                    return
-                }
-                // На Android 6+ нужно runtime-разрешение
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO)
-                        != PackageManager.PERMISSION_GRANTED) {
-                    pendingAudioRequest = request
-                    ActivityCompat.requestPermissions(
-                        this@MainActivity,
-                        arrayOf(Manifest.permission.RECORD_AUDIO),
-                        AUDIO_PERMISSION_CODE
-                    )
-                } else {
+                if (audioResources.isNotEmpty()) {
                     request.grant(audioResources)
+                } else {
+                    request.deny()
                 }
             }
         }
@@ -317,22 +317,12 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == AUDIO_PERMISSION_CODE) {
-            val saved = pendingAudioRequest
-            pendingAudioRequest = null
-            if (saved != null) {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    val audioResources = saved.resources.filter {
-                        it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
-                    }.toTypedArray()
-                    if (audioResources.isNotEmpty()) {
-                        saved.grant(audioResources)
-                    } else {
-                        saved.deny()
-                    }
-                } else {
-                    saved.deny()
-                }
+        if (requestCode == AUDIO_PERMISSION_CODE &&
+            grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            // Разрешение получено — перезагружаем WebView, чтобы сбросить кеш
+            val currentUrl = webView.url
+            if (currentUrl != null) {
+                webView.loadUrl(currentUrl)
             }
         }
     }
