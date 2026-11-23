@@ -24,5 +24,11 @@ Thumbs.db
 *.apk
 *.aab
 
+# wheel (собирается из исходников build_wheel.sh)
+app/alamp_memory-*.whl
+
 # вложенный git (nanobot-fork)
 nanobot-fork/
+
+# данные (БД, конфиги, промпты — не на GitHub)
+app/data/
