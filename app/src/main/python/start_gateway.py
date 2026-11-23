@@ -192,7 +192,7 @@ def _run_gateway(data_dir: str):
             },
             "providers": {
                 "openrouter": {
-                    "api_key": "your-key",
+                    "api_key": os.environ.get("OPENROUTER_API_KEY", "your-key"),
                     "api_base": "https://openrouter.ai/api/v1"
                 }
             },

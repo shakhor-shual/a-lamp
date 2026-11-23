@@ -30,7 +30,7 @@ echo -e "${YELLOW}🔧 1. Сборка wheel...${NC}"
 
 echo ""
 echo -e "${YELLOW}📦 2. Сборка APK...${NC}"
-export ANDROID_HOME=/home/ubuntu/Android/Sdk
+export ANDROID_HOME="${ANDROID_HOME:-/home/ubuntu/Android/Sdk}"
 export PATH=$PATH:$ANDROID_HOME/platform-tools
 
 if [ "$CLEAN" = true ]; then

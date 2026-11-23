@@ -8,7 +8,11 @@ DATA="app/data"
 PKG="com.alamp.app"
 NANOBOT_DIR="/data/data/$PKG/files/nanobot"
 
-ADB="/home/ubuntu/Android/Sdk/platform-tools/adb -s 10bcb36a"
+ADB="${ADB_CMD:-adb}"
+# Если указан ADB_SERIAL — добавляем -s
+if [ -n "${ADB_SERIAL:-}" ]; then
+    ADB="$ADB -s $ADB_SERIAL"
+fi
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
