@@ -1,0 +1,10 @@
+# Наши собранные wheel (x86_64 для эмулятора)
+./nanobot_ai-0.4.1.1-py3-none-any.whl
+./multidict-6.9.1-cp312-abi3-android_24_x86_64.whl
+./frozenlist-1.5.0-cp312-abi3-android_24_x86_64.whl
+./propcache-0.3.1-cp312-abi3-android_24_x86_64.whl
+./yarl-1.25.1-cp312-abi3-android_24_x86_64.whl
+./websockets-17.4-cp312-abi3-android_24_x86_64.whl
+./pydantic_core-2.41.5-cp312-abi3-android_24_x86_64.whl
+./dulwich-1.2.21-py3-none-any.whl
+./jiter-0.19.0-cp312-abi3-android_24_x86_64.whl

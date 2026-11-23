@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/action_tts"
+        android:icon="@android:drawable/ic_media_play"
+        android:title="Озвучка" />
+
+    <item
+        android:id="@+id/action_tts_settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="Настройки озвучки" />
+
+    <item
+        android:id="@+id/action_files"
+        android:icon="@android:drawable/ic_menu_edit"
+        android:title="Файлы nanobot" />
+
+    <item
+        android:id="@+id/action_import"
+        android:icon="@android:drawable/ic_menu_upload"
+        android:title="Импорт/Экспорт" />
+
+    <item
+        android:id="@+id/action_diagnostics"
+        android:icon="@android:drawable/ic_menu_info_details"
+        android:title="Диагностика" />
+
+    <item
+        android:id="@+id/action_font_size"
+        android:icon="@android:drawable/ic_menu_zoom"
+        android:title="Размер текста" />
+
+</menu>
