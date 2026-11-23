@@ -32,3 +32,6 @@ nanobot-fork/
 
 # данные (БД, конфиги, промпты — не на GitHub)
 app/data/
+
+# Большие wheel-файлы (x86_64, не для Android)
+app/nanobot_ai-*-manylinux*.whl
