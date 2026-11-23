@@ -175,7 +175,7 @@ class MainActivity : AppCompatActivity() {
                 val resources = request.resources.joinToString()
                 Log.d("A-lamp", "onPermissionRequest origin=$origin resources=[$resources]")
 
-                if (origin != "http://localhost:8765") {
+                if (!origin.startsWith("http://localhost:8765")) {
                     Log.w("A-lamp", "deny — unknown origin: $origin")
                     request.deny()
                     return
