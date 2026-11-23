@@ -23,3 +23,6 @@ Thumbs.db
 # APK
 *.apk
 *.aab
+
+# вложенный git (nanobot-fork)
+nanobot-fork/
