@@ -6,6 +6,7 @@ import android.view.MenuItem
 import android.webkit.WebView
 import androidx.appcompat.app.AlertDialog
 import android.webkit.WebViewClient
+import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.widget.TextView
 import android.widget.Toast
@@ -146,6 +147,23 @@ class MainActivity : AppCompatActivity() {
         webView.webChromeClient = object : WebChromeClient() {
             override fun onReceivedTitle(view: WebView?, title: String?) {
                 super.onReceivedTitle(view, title)
+            }
+
+            override fun onPermissionRequest(request: PermissionRequest?) {
+                request ?: return
+                // Разрешаем только аудиозахват, только от локального WebUI
+                if (request.origin.toString().startsWith("http://127.0.0.1:8765")) {
+                    val audioResources = request.resources.filter {
+                        it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                    }.toTypedArray()
+                    if (audioResources.isNotEmpty()) {
+                        request.grant(audioResources)
+                    } else {
+                        request.deny()
+                    }
+                } else {
+                    request.deny()
+                }
             }
         }
 
