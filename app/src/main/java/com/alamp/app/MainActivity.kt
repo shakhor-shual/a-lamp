@@ -1,6 +1,9 @@
 package com.alamp.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.MenuItem
 import android.webkit.WebView
@@ -11,6 +14,8 @@ import android.webkit.WebChromeClient
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.navigation.NavigationView
@@ -33,6 +38,8 @@ class MainActivity : AppCompatActivity() {
     private var ttsEnabled = true
     private var lastChatId: String? = null
     private var gatewayCheckJob: Job? = null
+    private var pendingAudioRequest: PermissionRequest? = null
+    private val AUDIO_PERMISSION_CODE = 1001
     private val healthClient = OkHttpClient.Builder()
         .connectTimeout(2, TimeUnit.SECONDS)
         .readTimeout(2, TimeUnit.SECONDS)
@@ -151,18 +158,29 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPermissionRequest(request: PermissionRequest?) {
                 request ?: return
-                // Разрешаем только аудиозахват, только от локального WebUI
-                if (request.origin.toString().startsWith("http://127.0.0.1:8765")) {
-                    val audioResources = request.resources.filter {
-                        it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
-                    }.toTypedArray()
-                    if (audioResources.isNotEmpty()) {
-                        request.grant(audioResources)
-                    } else {
-                        request.deny()
-                    }
-                } else {
+                if (!request.origin.toString().startsWith("http://127.0.0.1:8765")) {
                     request.deny()
+                    return
+                }
+                val audioResources = request.resources.filter {
+                    it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                }.toTypedArray()
+                if (audioResources.isEmpty()) {
+                    request.deny()
+                    return
+                }
+                // На Android 6+ нужно runtime-разрешение
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO)
+                        != PackageManager.PERMISSION_GRANTED) {
+                    pendingAudioRequest = request
+                    ActivityCompat.requestPermissions(
+                        this@MainActivity,
+                        arrayOf(Manifest.permission.RECORD_AUDIO),
+                        AUDIO_PERMISSION_CODE
+                    )
+                } else {
+                    request.grant(audioResources)
                 }
             }
         }
@@ -291,5 +309,31 @@ class MainActivity : AppCompatActivity() {
         ttsBridge?.destroy()
         ttsBridge = null
         super.onDestroy()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == AUDIO_PERMISSION_CODE) {
+            val saved = pendingAudioRequest
+            pendingAudioRequest = null
+            if (saved != null) {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    val audioResources = saved.resources.filter {
+                        it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                    }.toTypedArray()
+                    if (audioResources.isNotEmpty()) {
+                        saved.grant(audioResources)
+                    } else {
+                        saved.deny()
+                    }
+                } else {
+                    saved.deny()
+                }
+            }
+        }
     }
 }
