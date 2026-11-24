@@ -66,6 +66,9 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
         setupWebView()
         requestAudioPermission()
         startNanobotGateway()
@@ -150,6 +153,26 @@ class MainActivity : AppCompatActivity() {
                 if (ttsEnabled) {
                     checkUrlAndAttach()
                 }
+                // Инжектируем отладку getUserMedia
+                view?.evaluateJavascript("""
+                    (function() {
+                        if (window.__gmInjected) return;
+                        window.__gmInjected = true;
+                        const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+                        navigator.mediaDevices.getUserMedia = async function(constraints) {
+                            console.log('[A-lamp] getUserMedia called with:', JSON.stringify(constraints));
+                            try {
+                                const stream = await orig(constraints);
+                                console.log('[A-lamp] getUserMedia SUCCESS');
+                                return stream;
+                            } catch(e) {
+                                console.log('[A-lamp] getUserMedia ERROR: name=' + e.name + ' message=' + e.message);
+                                throw e;
+                            }
+                        };
+                        console.log('[A-lamp] getUserMedia hook installed');
+                    })();
+                """.trimIndent(), null)
             }
 
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
@@ -169,27 +192,19 @@ class MainActivity : AppCompatActivity() {
                 super.onReceivedTitle(view, title)
             }
 
+            override fun onConsoleMessage(msg: android.webkit.ConsoleMessage?): Boolean {
+                return super.onConsoleMessage(msg)
+            }
+
             override fun onPermissionRequest(request: PermissionRequest?) {
                 request ?: return
                 val origin = request.origin.toString()
-                val resources = request.resources.joinToString()
-                Log.d("A-lamp", "onPermissionRequest origin=$origin resources=[$resources]")
 
                 if (!origin.startsWith("http://localhost:8765")) {
-                    Log.w("A-lamp", "deny — unknown origin: $origin")
                     request.deny()
                     return
                 }
-                val audioResources = request.resources.filter {
-                    it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
-                }.toTypedArray()
-                if (audioResources.isNotEmpty()) {
-                    Log.d("A-lamp", "grant — audio capture for $origin")
-                    request.grant(audioResources)
-                } else {
-                    Log.w("A-lamp", "deny — no audio resources in request")
-                    request.deny()
-                }
+                request.grant(request.resources)
             }
         }
 
@@ -327,7 +342,7 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == AUDIO_PERMISSION_CODE &&
             grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            Log.d("A-lamp", "RECORD_AUDIO permission granted by user")
+
         }
     }
 }

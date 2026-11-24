@@ -138,128 +138,52 @@ def _search_fts(conn: sqlite3.Connection, query: str, limit: int = 5,
 
 # ─── Векторный поиск ───────────────────────────────────────────────────
 
-# Кэш эмбеддингов: (id, content, kind, ts_from, vector_bytes)
-# vector_bytes — struct.pack('1024f', ...) для быстрого cosine similarity
-_embedding_cache: list[tuple[int, str, str, str, bytes]] | None = None
-
-
-def _cosine_similarity_packed(a_bytes: bytes, b_bytes: bytes) -> float:
-    """Cosine similarity между двумя упакованными векторами (struct float32)."""
-    import struct
-    n = len(a_bytes) // 4
-    dot = a2 = b2 = 0.0
-    for i in range(n):
-        ai = struct.unpack_from('f', a_bytes, i * 4)[0]
-        bi = struct.unpack_from('f', b_bytes, i * 4)[0]
-        dot += ai * bi
-        a2 += ai * ai
-        b2 += bi * bi
-    if a2 == 0.0 or b2 == 0.0:
-        return 0.0
-    return dot / (a2 ** 0.5 * b2 ** 0.5)
-
-
-def _load_embedding_cache(conn: sqlite3.Connection) -> None:
-    """Загружает все эмбеддинги из chunks в кэш (один раз)."""
-    global _embedding_cache
-    if _embedding_cache is not None:
-        return
-
-    import json, struct
-
-    cur = conn.execute(
-        """
-        SELECT id, content, kind, ts_from, embedding
-        FROM chunks
-        WHERE embedding IS NOT NULL AND embedding != ''
-        """
-    )
-    cache = []
-    for r in cur.fetchall():
-        try:
-            vec = json.loads(r["embedding"])
-            vec_bytes = struct.pack(f'{len(vec)}f', *vec)
-        except Exception:
-            continue
-        cache.append((
-            r["id"],
-            r["content"] or "",
-            r["kind"] or "chunk",
-            str(r["ts_from"] or ""),
-            vec_bytes,
-        ))
-    _embedding_cache = cache
-
-
 def _search_vector(
     conn: sqlite3.Connection,
     query_embedding: list[float],
     limit: int = 5,
 ) -> tuple[list[SearchResult], str]:
-    """Векторный поиск.
-
-    Сначала пробует sqlite-vec (vec0 / vec_chunks).
-    Если недоступен — brute force по кэшированным эмбеддингам.
+    """Векторный поиск через sqlite-vec.
 
     Returns:
-        Кортеж (результаты, метод): метод — "⚡ sqlite-vec" или "🐌 brute-force".
+        Кортеж (результаты, метод): метод — "⚡ sqlite-vec".
+
+    Raises:
+        RuntimeError: Если sqlite-vec не загружен или vec_chunks не найдена.
     """
-    import struct
+    if not _load_vec(conn):
+        raise RuntimeError("sqlite-vec не загружен")
 
-    # Попытка 1: sqlite-vec
-    if _load_vec(conn):
-        try:
-            cur = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='vec_chunks'"
-            )
-            if cur.fetchone():
-                blob = _vec_to_blob(query_embedding)
-                cur = conn.execute(
-                    """
-                    SELECT v.distance, c.id, c.content, c.kind, c.ts_from
-                    FROM vec_chunks v
-                    JOIN chunks c ON c.id = v.rowid
-                    WHERE v.embedding MATCH ?
-                      AND k = ?
-                    """,
-                    (blob, limit),
-                )
-                rows = cur.fetchall()
-                return [
-                    SearchResult(
-                        content=r["content"] or "",
-                        kind=r["kind"] or "chunk",
-                        source="chunk",
-                        timestamp=str(r["ts_from"] or ""),
-                        distance=r["distance"],
-                        source_id=r["id"],
-                    )
-                    for r in rows
-                ], "⚡ sqlite-vec"
-        except Exception:
-            pass
+    cur = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='vec_chunks'"
+    )
+    if not cur.fetchone():
+        raise RuntimeError("vec_chunks не найдена")
 
-    # Попытка 2: brute force по кэшированным эмбеддингам
-    _load_embedding_cache(conn)
-    query_bytes = struct.pack(f'{len(query_embedding)}f', *query_embedding)
+    blob = _vec_to_blob(query_embedding)
+    cur = conn.execute(
+        """
+        SELECT v.distance, c.id, c.content, c.kind, c.ts_from
+        FROM vec_chunks v
+        JOIN chunks c ON c.id = v.rowid
+        WHERE v.embedding MATCH ?
+          AND k = ?
+        """,
+        (blob, limit),
+    )
+    rows = cur.fetchall()
 
-    scored: list[tuple[float, SearchResult]] = []
-    for cid, content, kind, ts_from, vec_bytes in _embedding_cache:
-        sim = _cosine_similarity_packed(query_bytes, vec_bytes)
-        scored.append((
-            sim,
-            SearchResult(
-                content=content,
-                kind=kind,
-                source="chunk",
-                timestamp=ts_from,
-                distance=sim,
-                source_id=cid,
-            ),
-        ))
-
-    scored.sort(key=lambda x: -x[0])
-    return [sr for _, sr in scored[:limit]], "🐌 brute-force"
+    return [
+        SearchResult(
+            content=r["content"] or "",
+            kind=r["kind"] or "chunk",
+            source="chunk",
+            timestamp=str(r["ts_from"] or ""),
+            distance=r["distance"],
+            source_id=r["id"],
+        )
+        for r in rows
+    ], "⚡ sqlite-vec"
 
 
 # ─── Контекст вокруг записи ────────────────────────────────────────────
