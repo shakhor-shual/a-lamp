@@ -11,36 +11,10 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <WebView
+        <com.ailamp.app.ChatWebView
             android:id="@+id/webview"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
-
-        <LinearLayout
-            android:id="@+id/export_progress_panel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="?android:attr/colorBackground"
-            android:elevation="6dp"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/export_progress_label"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:accessibilityLiveRegion="polite"
-                android:textAppearance="?android:attr/textAppearanceMedium" />
-
-            <ProgressBar
-                android:id="@+id/export_progress_bar"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:indeterminateOnly="false" />
-
-        </LinearLayout>
 
         <!-- Индикатор статуса внизу -->
         <TextView
@@ -56,6 +30,8 @@
             android:paddingVertical="4dp"
             android:visibility="gone" />
 
+        <include layout="@layout/agent_management" />
+
     </FrameLayout>
 
     <!-- Выдвижная шторка -->
@@ -64,6 +40,7 @@
         android:layout_width="280dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
+        android:background="@color/shell_surface"
         app:menu="@menu/drawer_menu"
         app:headerLayout="@layout/nav_header" />
 

@@ -126,6 +126,7 @@ def replace_agent(stage: Path, workspace: Path, database: Path, config: Path, em
     markdown.update(file.name for file in incoming.glob("*.md"))
     moves = [(incoming / name, workspace / name) for name in (*sorted(markdown), *WORKSPACE_DIRS)]
     moves.extend([(stage / "config.json", config), (stage / "alamp_config.json", embeddings)])
+    moves.extend((None, target.with_name(target.name + ".bak")) for target in (config, embeddings))
     moves.extend((None, Path(str(database) + suffix)) for suffix in ("-wal", "-shm", "-journal"))
     moves.append((stage / "sessions.sqlite3", database))
     rollback = stage / "previous"

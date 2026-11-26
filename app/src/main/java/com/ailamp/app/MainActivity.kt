@@ -58,6 +58,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val MANAGEMENT_OPEN = "agent_management_open"
         private val exportInProgress = AtomicBoolean(false)
         private val exportProgress = MutableStateFlow<ExportProgress?>(null)
     }
@@ -79,9 +80,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private lateinit var webView: WebView
+    private val agentEditor = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            lastChatId = null
+            ttsClient?.stop()
+            waitForGateway()
+        }
+    }
+
+    private lateinit var webView: ChatWebView
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var navView: NavigationView
+    private lateinit var agentManagement: View
     private lateinit var tvStatus: TextView
     private var ttsBridge: TtsBridge? = null
     private var ttsClient: TtsClient? = null
@@ -107,12 +117,28 @@ class MainActivity : AppCompatActivity() {
         navView = findViewById(R.id.nav_view)
         tvStatus = findViewById(R.id.tv_status)
         webView = findViewById(R.id.webview)
+        agentManagement = findViewById(R.id.agent_management)
+        findViewById<View>(R.id.agent_management_back).setOnClickListener { showAgentManagement(false) }
+        val actions = listOf(
+            R.id.agent_management_export to { chooseExportDestination() },
+            R.id.agent_management_import to {
+                importSource.launch(arrayOf("application/zip", "application/octet-stream"))
+            },
+            R.id.agent_management_configs to { openAgentEditor(AgentEditorActivity.CONFIGS) },
+            R.id.agent_management_prompts to { openAgentEditor(AgentEditorActivity.PROMPTS) },
+        ).map { (id, action) ->
+            findViewById<View>(id).apply {
+                setOnClickListener { if (!exportInProgress.get()) action() }
+            }
+        }
+        showAgentManagement(savedInstanceState?.getBoolean(MANAGEMENT_OPEN) == true)
         val exportPanel = findViewById<View>(R.id.export_progress_panel)
         val exportLabel = findViewById<TextView>(R.id.export_progress_label)
         val exportBar = findViewById<ProgressBar>(R.id.export_progress_bar)
         exportProgressJob = CoroutineScope(Dispatchers.Main).launch {
             exportProgress.collect { progress ->
                 exportPanel.visibility = if (progress == null) View.GONE else View.VISIBLE
+                actions.forEach { it.isEnabled = progress == null }
                 if (progress != null) {
                     exportLabel.text = progress.label
                     exportBar.isIndeterminate = progress.percent == null
@@ -132,6 +158,7 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             WebView.setWebContentsDebuggingEnabled(true)
         }
+        ttsEnabled = VoiceSettings.read(this).enabled
         setupWebView()
         requestAudioPermission()
         startNanobotGateway()
@@ -140,20 +167,30 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleMenuItem(item: MenuItem) {
         when (item.itemId) {
-            R.id.action_tts -> toggleTts()
-            R.id.action_tts_settings -> startActivity(Intent(this, TtsSettingsActivity::class.java))
-            R.id.action_files -> Toast.makeText(this, "Файлы — скоро", Toast.LENGTH_SHORT).show()
-            R.id.action_import -> chooseExportDestination()
-            R.id.action_restore_agent -> {
-                if (exportInProgress.get()) {
-                    Toast.makeText(this, "Импорт или экспорт уже выполняется", Toast.LENGTH_SHORT).show()
-                } else {
-                    importSource.launch(arrayOf("application/zip", "application/octet-stream"))
-                }
+            R.id.action_voice -> {
+                startActivity(Intent(this, TtsSettingsActivity::class.java))
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
             }
+            R.id.action_agent_management -> showAgentManagement(true)
             R.id.action_diagnostics -> Toast.makeText(this, "Диагностика — скоро", Toast.LENGTH_SHORT).show()
             R.id.action_font_size -> showFontSizeDialog()
         }
+    }
+
+    private fun showAgentManagement(open: Boolean) {
+        agentManagement.visibility = if (open) View.VISIBLE else View.GONE
+        webView.visibility = if (open) View.INVISIBLE else View.VISIBLE
+        drawerLayout.setDrawerLockMode(
+            if (open) DrawerLayout.LOCK_MODE_LOCKED_CLOSED else DrawerLayout.LOCK_MODE_UNLOCKED,
+            GravityCompat.START
+        )
+    }
+
+    private fun openAgentEditor(section: String) {
+        agentEditor.launch(
+            Intent(this, AgentEditorActivity::class.java).putExtra(AgentEditorActivity.SECTION, section)
+        )
     }
 
     private fun importAgent(source: Uri) {
@@ -261,18 +298,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun toggleTts() {
-        ttsEnabled = !ttsEnabled
-        if (ttsEnabled) {
+    override fun onResume() {
+        super.onResume()
+        webView.setKeyboardHidden(
+            VoiceSettings.preferences(this).getBoolean(VoiceSettings.HIDE_WEB_KEYBOARD, false)
+        )
+        val enabled = VoiceSettings.read(this).enabled
+        ttsBridge?.reloadSettings()
+        if (enabled == ttsEnabled) return
+        ttsEnabled = enabled
+        if (enabled) {
             checkUrlAndAttach()
-            Toast.makeText(this, "🧞 Озвучка включена", Toast.LENGTH_SHORT).show()
-            navView.menu.findItem(R.id.action_tts)?.setIcon(android.R.drawable.ic_media_play)
         } else {
             lastChatId = null
             ttsClient?.stop()
-            ttsBridge?.stop()
-            Toast.makeText(this, "🧞 Озвучка выключена", Toast.LENGTH_SHORT).show()
-            navView.menu.findItem(R.id.action_tts)?.setIcon(android.R.drawable.ic_media_pause)
         }
     }
 
@@ -290,9 +329,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun setStatus(text: String) {
         tvStatus.text = text
-        tvStatus.visibility = android.view.View.VISIBLE
+        tvStatus.visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
         val header = navView.getHeaderView(0)
-        header.findViewById<TextView>(R.id.tv_status_header)?.text = text
+        header.findViewById<TextView>(R.id.tv_status_header)?.apply {
+            this.text = text
+            visibility = tvStatus.visibility
+        }
     }
 
     private fun setupWebView() {
@@ -325,6 +367,7 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                webView.applyKeyboardSetting()
                 if (ttsEnabled) {
                     checkUrlAndAttach()
                 }
@@ -498,11 +541,18 @@ class MainActivity : AppCompatActivity() {
     override fun onBackPressed() {
         if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
             drawerLayout.closeDrawer(GravityCompat.START)
+        } else if (agentManagement.visibility == View.VISIBLE) {
+            showAgentManagement(false)
         } else if (webView.canGoBack()) {
             webView.goBack()
         } else {
             super.onBackPressed()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(MANAGEMENT_OPEN, agentManagement.visibility == View.VISIBLE)
     }
 
     override fun onDestroy() {

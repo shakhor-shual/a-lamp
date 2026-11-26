@@ -2,29 +2,14 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/action_tts"
-        android:icon="@android:drawable/ic_media_play"
-        android:title="Озвучка" />
+        android:id="@+id/action_voice"
+        android:icon="@android:drawable/ic_btn_speak_now"
+        android:title="@string/voice_settings_title" />
 
     <item
-        android:id="@+id/action_tts_settings"
-        android:icon="@android:drawable/ic_menu_preferences"
-        android:title="Настройки озвучки" />
-
-    <item
-        android:id="@+id/action_files"
-        android:icon="@android:drawable/ic_menu_edit"
-        android:title="Файлы nanobot" />
-
-    <item
-        android:id="@+id/action_import"
-        android:icon="@android:drawable/ic_menu_upload"
-        android:title="Экспорт агента" />
-
-    <item
-        android:id="@+id/action_restore_agent"
-        android:icon="@android:drawable/ic_menu_save"
-        android:title="Импорт агента" />
+        android:id="@+id/action_agent_management"
+        android:icon="@android:drawable/ic_menu_manage"
+        android:title="@string/agent_management_title" />
 
     <item
         android:id="@+id/action_diagnostics"

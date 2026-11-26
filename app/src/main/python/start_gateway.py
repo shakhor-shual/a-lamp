@@ -157,6 +157,39 @@ def _retarget_import_config(config, workspace) -> None:
     gateway.pop("health", None)
 
 
+def agent_editor(data_dir: str, section: str, operation: str, name="", revision="", text="") -> str:
+    from pathlib import Path
+    from agent_editor import list_files, read_file, write_file
+
+    config_dir = Path(data_dir) / "nanobot"
+    with _gateway_lock:
+        workspace = _gateway_paths[0] if _gateway_paths is not None else None
+        try:
+            if operation == "list":
+                result = {"files": list_files(config_dir, workspace, section)}
+            elif operation == "read":
+                result = read_file(config_dir, workspace, section, name)
+            elif operation in ("save", "revert"):
+                result = write_file(
+                    config_dir, workspace, section, name, revision, text if operation == "save" else None,
+                )
+            else:
+                raise ValueError("Неизвестная операция редактора.")
+        except ValueError as error:
+            result = {"error": str(error)}
+        return json.dumps(result, ensure_ascii=False)
+
+
+def restart_gateway(data_dir: str) -> None:
+    with _gateway_lock:
+        if _gateway_thread is not None and _gateway_thread.is_alive():
+            if _gateway_paths is None:
+                raise RuntimeError("Шлюз ещё запускается")
+            _gateway_stop.set()
+            _gateway_thread.join()
+        _run_gateway(data_dir, check_bootstrap=False)
+
+
 def _legacy_workspaces(data_dir: str):
     from pathlib import Path
 

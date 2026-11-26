@@ -4,7 +4,7 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="?attr/colorPrimary"
+    android:background="@color/shell_header"
     android:theme="@style/ThemeOverlay.MaterialComponents.Dark">
 
     <TextView
@@ -19,9 +19,9 @@
         android:id="@+id/tv_status_header"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="..."
+        android:layout_marginTop="4dp"
+        android:textColor="#DDE7F3"
         android:textSize="12sp"
-        android:textColor="#CCFFFFFF"
-        android:layout_marginTop="4dp" />
+        android:visibility="gone" />
 
 </LinearLayout>

@@ -1,6 +1,8 @@
 package com.ailamp.app
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -10,123 +12,139 @@ import java.util.*
 class TtsBridge(
     private val context: Context,
     private val onSpeakingChange: (Boolean) -> Unit
-) : TextToSpeech.OnInitListener {
-
-    companion object {
-        const val TAG = "TtsBridge"
-    }
-
+) {
+    private val main = Handler(Looper.getMainLooper())
+    private val preferences = VoiceSettings.preferences(context)
+    private var settings = VoiceSettings.read(context)
     private var tts: TextToSpeech? = null
-    private var isReady = false
-    private val queue = mutableListOf<String>()
+    private var generation = 0
+    private var ready = false
+    private var destroyed = false
+    @Volatile private var speaking = false
+    private val queue = ArrayDeque<String>()
 
     init {
-        tts = TextToSpeech(context, this)
-        tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {
-                onSpeakingChange(true)
+        startEngine()
+    }
+
+    private fun startEngine() {
+        val current = ++generation
+        ready = false
+        stopSpeaking(clearPending = false)
+        tts?.shutdown()
+        val engine = TextToSpeech(context, { result ->
+            main.post {
+                if (current != generation || destroyed) return@post
+                ready = result == TextToSpeech.SUCCESS
+                if (ready) {
+                    tts?.let(settings::applyTo)
+                    flushQueue()
+                } else {
+                    queue.clear()
+                    Log.w("TtsBridge", "TTS initialization failed ($result)")
+                }
             }
-            override fun onDone(utteranceId: String?) {
-                onSpeakingChange(false)
-                speakNext()
-            }
-            override fun onError(utteranceId: String?) {
-                onSpeakingChange(false)
-                speakNext()
+        }, settings.engine)
+        tts = engine
+        engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) = updateSpeaking(true)
+            override fun onDone(utteranceId: String?) = updateSpeaking(false)
+            override fun onError(utteranceId: String?) = updateSpeaking(false)
+
+            private fun updateSpeaking(active: Boolean) {
+                main.post {
+                    if (current == generation && !destroyed) {
+                        setSpeaking(settings.enabled && (active || tts?.isSpeaking == true))
+                    }
+                }
             }
         })
     }
 
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            isReady = true
-            val prefs = context.getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
-            val lang = prefs.getString("tts_lang", "ru") ?: "ru"
-            val locale = if (lang == "ru") Locale("ru") else Locale.US
-            tts?.setLanguage(locale)
-            val speed = prefs.getFloat("tts_speed", 1.0f)
-            tts?.setSpeechRate(speed)
-            Log.d(TAG, "TTS ready: $lang @ $speed")
-            // Озвучиваем накопленное
-            flushQueue()
-        } else {
-            Log.e(TAG, "TTS init failed: $status")
+    fun reloadSettings() {
+        val updated = VoiceSettings.read(context)
+        if (settings == updated || destroyed) return
+        val engineChanged = settings.engine != updated.engine
+        settings = updated
+        if (!settings.enabled) stopSpeaking()
+        if (engineChanged) {
+            startEngine()
+        } else if (ready) {
+            tts?.let(settings::applyTo)
         }
     }
 
     @JavascriptInterface
     fun speak(text: String) {
         val clean = cleanTextForTts(text)
-        Log.d(TAG, "speak: ${clean.take(50)}...")
-        synchronized(queue) {
-            queue.add(clean)
-        }
-        if (isReady) {
-            flushQueue()
+        if (clean.isBlank()) return
+        main.post {
+            if (!destroyed && settings.enabled) {
+                queue.addLast(clean)
+                flushQueue()
+            }
         }
     }
 
     @JavascriptInterface
     fun setSpeed(speed: Float) {
-        tts?.setSpeechRate(speed)
-        context.getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
-            .edit().putFloat("tts_speed", speed).apply()
+        if (!speed.isFinite()) return
+        main.post {
+            preferences.edit().putFloat("tts_speed", speed.coerceIn(0.3f, 3f)).apply()
+            reloadSettings()
+        }
     }
 
     @JavascriptInterface
     fun setLanguage(lang: String) {
-        val locale = if (lang == "ru") Locale("ru") else Locale.US
-        tts?.setLanguage(locale)
-        context.getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
-            .edit().putString("tts_lang", lang).apply()
-    }
-
-    @JavascriptInterface
-    fun stop() {
-        tts?.stop()
-        synchronized(queue) {
-            queue.clear()
-        }
-        onSpeakingChange(false)
-    }
-
-    @JavascriptInterface
-    fun isSpeaking(): Boolean {
-        return tts?.isSpeaking ?: false
-    }
-
-    private fun flushQueue() {
-        synchronized(queue) {
-            // Читаем актуальную скорость из настроек перед озвучкой
-            val prefs = context.getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
-            val speed = prefs.getFloat("tts_speed", 1.0f)
-            tts?.setSpeechRate(speed)
-
-            while (queue.isNotEmpty()) {
-                val text = queue.removeFirst()
-                val ssml = toSsmlWithPauses(text)
-                speakSsml(ssml)
+        val language = Locale.forLanguageTag(lang).toLanguageTag()
+        if (language == "und") return
+        main.post {
+            if (settings.language != language) {
+                preferences.edit().putString("tts_lang", language).remove("tts_voice").apply()
+                reloadSettings()
             }
         }
     }
 
-    private fun speakNext() {
-        synchronized(queue) {
-            if (queue.isNotEmpty()) {
-                // Читаем актуальную скорость из настроек перед озвучкой
-                val prefs = context.getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
-                val speed = prefs.getFloat("tts_speed", 1.0f)
-                tts?.setSpeechRate(speed)
+    @JavascriptInterface
+    fun stop() {
+        main.post { stopSpeaking() }
+    }
 
-                val text = queue.removeFirst()
-                val ssml = toSsmlWithPauses(text)
-                speakSsml(ssml)
+    @JavascriptInterface
+    fun isSpeaking(): Boolean = speaking
+
+    private fun setSpeaking(active: Boolean) {
+        if (speaking != active) {
+            speaking = active
+            onSpeakingChange(active)
+        }
+    }
+
+    private fun stopSpeaking(clearPending: Boolean = true) {
+        tts?.stop()
+        if (clearPending) queue.clear()
+        setSpeaking(false)
+    }
+
+    private fun flushQueue() {
+        val engine = tts ?: return
+        if (!ready || !settings.enabled) return
+        while (queue.isNotEmpty()) {
+            val paragraphs = queue.removeFirst().split(Regex("""\n\s*\n"""))
+            paragraphs.filter { it.isNotBlank() }.forEachIndexed { index, paragraph ->
+                if (index > 0) {
+                    engine.playSilentUtterance(600, TextToSpeech.QUEUE_ADD, UUID.randomUUID().toString())
+                }
+                engine.speak(paragraph, TextToSpeech.QUEUE_ADD, null, UUID.randomUUID().toString())
             }
         }
     }
 
     fun destroy() {
-        tts?.stop()
+        destroyed = true
+        stopSpeaking()
         tts?.shutdown()
         tts = null
     }
@@ -148,46 +166,5 @@ class TtsBridge(
         // Варианты селекторов и Zero-Width Joiner
         result = result.replace(Regex("""[\uFE00-\uFE0F\u200D]"""), "")
         return result.trim()
-    }
-
-    /**
-     * Разбивает текст на абзацы и оборачивает в SSML с паузами между ними.
-     */
-    private fun toSsmlWithPauses(text: String): String {
-        val paragraphs = text.split(Regex("""\n\s*\n"""))
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-        if (paragraphs.isEmpty()) return ""
-        if (paragraphs.size == 1) return paragraphs[0]
-
-        val sb = StringBuilder()
-        sb.append("<?xml version=\"1.0\"?>\n<speak>\n")
-        for (i in paragraphs.indices) {
-            if (i > 0) {
-                sb.append("<break time=\"600ms\"/>\n")
-            }
-            sb.append(escapeXml(paragraphs[i]))
-            sb.append("\n")
-        }
-        sb.append("</speak>")
-        return sb.toString()
-    }
-
-    private fun escapeXml(text: String): String {
-        return text
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\"", "&quot;")
-    }
-
-    private fun speakSsml(ssml: String) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-            val utteranceId = UUID.randomUUID().toString()
-            tts?.speak(ssml, TextToSpeech.QUEUE_ADD, null, utteranceId)
-        } else {
-            @Suppress("DEPRECATION")
-            tts?.speak(ssml, TextToSpeech.QUEUE_ADD, null)
-        }
     }
 }

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/agent_management"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/shell_surface"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/agent_management_back"
+            style="@style/EditorAction"
+            android:contentDescription="Назад к чату"
+            android:src="@android:drawable/ic_menu_revert" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:accessibilityHeading="true"
+            android:text="@string/agent_management_title"
+            android:textAppearance="?android:attr/textAppearanceLarge" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/export_progress_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/shell_surface"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/export_progress_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite"
+            android:textAppearance="?android:attr/textAppearanceMedium" />
+
+        <ProgressBar
+            android:id="@+id/export_progress_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:indeterminateOnly="false" />
+
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="12dp">
+
+            <TextView
+                style="@style/ShellSectionHeading"
+                android:text="Архив агента" />
+
+            <Button
+                android:id="@+id/agent_management_export"
+                style="@style/ShellAction"
+                android:drawableStart="@android:drawable/ic_menu_upload"
+                android:text="Экспорт агента" />
+
+            <Button
+                android:id="@+id/agent_management_import"
+                style="@style/ShellAction"
+                android:drawableStart="@android:drawable/ic_menu_save"
+                android:text="Импорт агента" />
+
+            <TextView
+                style="@style/ShellSectionHeading"
+                android:text="Файлы агента" />
+
+            <Button
+                android:id="@+id/agent_management_configs"
+                style="@style/ShellAction"
+                android:drawableStart="@android:drawable/ic_menu_preferences"
+                android:text="Конфиги" />
+
+            <Button
+                android:id="@+id/agent_management_prompts"
+                style="@style/ShellAction"
+                android:drawableStart="@android:drawable/ic_menu_edit"
+                android:text="Промпты" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
