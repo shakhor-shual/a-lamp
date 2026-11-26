@@ -14,5 +14,5 @@ dependencyResolutionManagement {
         maven { url = uri("https://chaquo.com/maven") }
     }
 }
-rootProject.name = "HelloAndroid"
+rootProject.name = "AI-Lamp"
 include(":app")

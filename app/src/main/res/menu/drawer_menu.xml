@@ -19,7 +19,12 @@
     <item
         android:id="@+id/action_import"
         android:icon="@android:drawable/ic_menu_upload"
-        android:title="Импорт/Экспорт" />
+        android:title="Экспорт агента" />
+
+    <item
+        android:id="@+id/action_restore_agent"
+        android:icon="@android:drawable/ic_menu_save"
+        android:title="Импорт агента" />
 
     <item
         android:id="@+id/action_diagnostics"

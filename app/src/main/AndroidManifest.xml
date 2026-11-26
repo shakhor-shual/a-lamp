@@ -7,13 +7,14 @@
 
     <application
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
-        android:theme="@style/Theme.A_lamp">
+        android:theme="@style/Theme.AILamp">
 
         <activity
-            android:name="com.alamp.app.MainActivity"
+            android:name="com.ailamp.app.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -22,9 +23,9 @@
         </activity>
 
         <activity
-            android:name="com.alamp.app.TtsSettingsActivity"
+            android:name="com.ailamp.app.TtsSettingsActivity"
             android:exported="false"
-            android:parentActivityName="com.alamp.app.MainActivity" />
+            android:parentActivityName="com.ailamp.app.MainActivity" />
 
     </application>
 

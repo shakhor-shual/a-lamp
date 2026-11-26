@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.alamp.app"
+    namespace = "com.ailamp.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.alamp.app"
+        applicationId = "com.ailamp.app"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

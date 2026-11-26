@@ -1,4 +1,4 @@
-package com.alamp.app
+package com.ailamp.app
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -20,11 +20,11 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
 
     companion object {
         const val TAG = "TtsService"
-        const val CHANNEL_ID = "a-lamp-tts"
+        const val CHANNEL_ID = "ai-lamp-tts"
         const val NOTIFICATION_ID = 1001
-        const val ACTION_START = "com.alamp.app.START_TTS"
-        const val ACTION_STOP = "com.alamp.app.STOP_TTS"
-        const val ACTION_TOGGLE = "com.alamp.app.TOGGLE_TTS"
+        const val ACTION_START = "com.ailamp.app.START_TTS"
+        const val ACTION_STOP = "com.ailamp.app.STOP_TTS"
+        const val ACTION_TOGGLE = "com.ailamp.app.TOGGLE_TTS"
 
         var isRunning = false
             private set
@@ -75,7 +75,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
         isActive = true
         isRunning = true
 
-        val notification = createNotification("🧞 A-lamp слушает")
+        val notification = createNotification("🧞 AI-Lamp слушает")
         startForeground(NOTIFICATION_ID, notification)
 
         connectWebSocket()
@@ -99,13 +99,13 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
 
     private fun connectWebSocket() {
         val request = Request.Builder()
-            .url("ws://127.0.0.1:8765/")
+            .url("ws://127.0.0.1:8766/")
             .build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.d(TAG, "WebSocket connected")
-                updateNotification("🧞 A-lamp подключена")
+                updateNotification("🧞 AI-Lamp подключена")
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -177,7 +177,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
 
     private fun speak(text: String) {
         if (text.isBlank()) return
-        val prefs = getSharedPreferences("a-lamp", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
         val speed = prefs.getFloat("tts_speed", 1.0f)
         tts.setSpeechRate(speed)
 
@@ -188,12 +188,12 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
             @Suppress("DEPRECATION")
             tts.speak(text, TextToSpeech.QUEUE_ADD, null)
         }
-        updateNotification("🧞 A-lamp говорит...")
+        updateNotification("🧞 AI-Lamp говорит...")
     }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            val prefs = getSharedPreferences("a-lamp", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
             val lang = prefs.getString("tts_lang", "ru") ?: "ru"
             val locale = if (lang == "ru") Locale("ru") else Locale.US
             tts.setLanguage(locale)
@@ -207,7 +207,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "A-lamp TTS",
+                "AI-Lamp TTS",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Уведомления голосового ассистента"
@@ -225,7 +225,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
             Notification.Builder(this)
         }
         return builder
-            .setContentTitle("A-lamp")
+            .setContentTitle("AI-Lamp")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setOngoing(true)

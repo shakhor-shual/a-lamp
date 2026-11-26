@@ -1,4 +1,4 @@
-package com.alamp.app
+package com.ailamp.app
 
 import android.util.Log
 import kotlinx.coroutines.*
@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit
 
 class TtsClient(
     private val ttsBridge: TtsBridge,
-    private val baseUrl: String = "http://127.0.0.1:8765"
+    private val baseUrl: String = "http://127.0.0.1:8766"
 ) {
     companion object {
         private const val TAG = "TtsClient"
@@ -58,7 +58,7 @@ class TtsClient(
                     return@launch
                 }
 
-                val wsUrl = "ws://127.0.0.1:8765/?token=$token"
+                val wsUrl = "ws://127.0.0.1:8766/?token=$token"
                 Log.d(TAG, "Connecting to $wsUrl")
 
                 val wsClient = OkHttpClient.Builder()

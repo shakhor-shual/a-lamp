@@ -54,17 +54,17 @@ if [ "$INSTALL" = true ]; then
     echo -e "${YELLOW}📱 3. Установка на телефон...${NC}"
 
     # Останавливаем приложение
-    adb shell am force-stop com.alamp.app 2>/dev/null || true
+    adb shell am force-stop com.ailamp.app 2>/dev/null || true
     sleep 1
 
     # Устанавливаем
     adb install -r "$APK" 2>&1
 
     # Чистим кэш Chaquopy (БД и конфиг не трогаем)
-    adb shell run-as com.alamp.app rm -rf /data/data/com.alamp.app/files/chaquopy 2>/dev/null || true
+    adb shell run-as com.ailamp.app rm -rf /data/data/com.ailamp.app/files/chaquopy 2>/dev/null || true
 
     # Запускаем
-    adb shell am start -n com.alamp.app/.MainActivity 2>&1
+    adb shell am start -n com.ailamp.app/.MainActivity 2>&1
 
     echo -e "${GREEN}✅ APK установлен и запущен${NC}"
 fi

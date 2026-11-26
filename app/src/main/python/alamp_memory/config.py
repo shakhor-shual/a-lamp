@@ -28,11 +28,12 @@ def _find_services(db_path: str) -> str | None:
     """Ищет alamp_config.json рядом с БД."""
     db_dir = os.path.dirname(os.path.abspath(db_path))
     candidates = [
+        os.environ.get("ALAMP_CONFIG_PATH"),
         os.path.join(db_dir, "alamp_config.json"),
         os.path.join(os.path.dirname(db_dir), "alamp_config.json"),
     ]
     for path in candidates:
-        if os.path.exists(path):
+        if path and os.path.exists(path):
             return path
     return None
 

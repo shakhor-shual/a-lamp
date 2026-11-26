@@ -1,4 +1,4 @@
-package com.alamp.app
+package com.ailamp.app
 
 import android.content.Context
 import android.speech.tts.TextToSpeech
@@ -40,7 +40,7 @@ class TtsBridge(
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             isReady = true
-            val prefs = context.getSharedPreferences("a-lamp", Context.MODE_PRIVATE)
+            val prefs = context.getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
             val lang = prefs.getString("tts_lang", "ru") ?: "ru"
             val locale = if (lang == "ru") Locale("ru") else Locale.US
             tts?.setLanguage(locale)
@@ -69,7 +69,7 @@ class TtsBridge(
     @JavascriptInterface
     fun setSpeed(speed: Float) {
         tts?.setSpeechRate(speed)
-        context.getSharedPreferences("a-lamp", Context.MODE_PRIVATE)
+        context.getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
             .edit().putFloat("tts_speed", speed).apply()
     }
 
@@ -77,7 +77,7 @@ class TtsBridge(
     fun setLanguage(lang: String) {
         val locale = if (lang == "ru") Locale("ru") else Locale.US
         tts?.setLanguage(locale)
-        context.getSharedPreferences("a-lamp", Context.MODE_PRIVATE)
+        context.getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
             .edit().putString("tts_lang", lang).apply()
     }
 
@@ -98,7 +98,7 @@ class TtsBridge(
     private fun flushQueue() {
         synchronized(queue) {
             // Читаем актуальную скорость из настроек перед озвучкой
-            val prefs = context.getSharedPreferences("a-lamp", Context.MODE_PRIVATE)
+            val prefs = context.getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
             val speed = prefs.getFloat("tts_speed", 1.0f)
             tts?.setSpeechRate(speed)
 
@@ -114,7 +114,7 @@ class TtsBridge(
         synchronized(queue) {
             if (queue.isNotEmpty()) {
                 // Читаем актуальную скорость из настроек перед озвучкой
-                val prefs = context.getSharedPreferences("a-lamp", Context.MODE_PRIVATE)
+                val prefs = context.getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
                 val speed = prefs.getFloat("tts_speed", 1.0f)
                 tts?.setSpeechRate(speed)
 

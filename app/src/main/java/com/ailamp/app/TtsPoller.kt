@@ -1,4 +1,4 @@
-package com.alamp.app
+package com.ailamp.app
 
 import android.webkit.WebView
 

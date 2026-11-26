@@ -1,4 +1,4 @@
-package com.alamp.app
+package com.ailamp.app
 
 import android.content.Context
 import android.content.Intent
@@ -30,7 +30,7 @@ class TtsSettingsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         langSwitch = findViewById(R.id.langSwitch)
         testButton = findViewById(R.id.testButton)
 
-        val prefs = getSharedPreferences("a-lamp", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
 
         // Скорость
         val currentSpeed = prefs.getFloat("tts_speed", 1.0f)
@@ -64,15 +64,15 @@ class TtsSettingsActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         // Тест
         testButton.setOnClickListener {
             val lang = prefs.getString("tts_lang", "ru") ?: "ru"
-            val text = if (lang == "ru") "Привет, я A-lamp. Я готова говорить."
-                       else "Hello, I am A-lamp. I am ready to speak."
+            val text = if (lang == "ru") "Привет, я AI-Lamp. Я готова говорить."
+                       else "Hello, I am AI-Lamp. I am ready to speak."
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "test")
         }
     }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            val prefs = getSharedPreferences("a-lamp", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
             val lang = prefs.getString("tts_lang", "ru") ?: "ru"
             val locale = if (lang == "ru") Locale("ru") else Locale.US
             tts.setLanguage(locale)

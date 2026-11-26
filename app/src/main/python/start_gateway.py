@@ -1,5 +1,6 @@
 """Запуск шлюза nanobot 0.4.1 на Android."""
 
+import asyncio
 import sys
 import os
 import json
@@ -47,13 +48,22 @@ except ImportError:
     pass  # Если нет nanobot или alamp_memory — не страшно
 # --- Конец monkey-patch ---
 
+_gateway_lock = threading.Lock()
+_gateway_thread = None
+_gateway_stop = None
+_gateway_paths = None
+_WEB_PORT = 8766
+_HEALTH_PORT = 18791
+
 
 def start_gateway(data_dir: str) -> str:
     """
     Запускает шлюз nanobot в фоновом потоке.
     """
     try:
-        _run_gateway(data_dir)
+        with _gateway_lock:
+            if _gateway_thread is None or not _gateway_thread.is_alive():
+                _run_gateway(data_dir)
         return "ok"
     except Exception as e:
         tb = traceback.format_exc()
@@ -62,6 +72,101 @@ def start_gateway(data_dir: str) -> str:
         with open(log_path, "w") as f:
             f.write(f"Error: {e}\n{tb}")
         return f"ERROR: {e}"
+
+
+def export_agent(data_dir: str, archive_path: str, progress=None) -> None:
+    """Останавливает шлюз на время подготовки снимка агента."""
+    from tempfile import TemporaryDirectory
+    from pathlib import Path
+
+    from agent_export import snapshot_agent, write_archive
+
+    archive = Path(archive_path)
+    with TemporaryDirectory(prefix="agent-export-", dir=archive.parent) as directory:
+        snapshot = Path(directory)
+        with _gateway_lock:
+            paths = _gateway_paths
+            if paths is None or _gateway_thread is None or not _gateway_thread.is_alive():
+                raise RuntimeError("Шлюз ещё не готов")
+
+            if progress is not None:
+                progress.accept(1)
+            _gateway_stop.set()
+            _gateway_thread.join()
+            try:
+                if progress is not None:
+                    progress.accept(2)
+                snapshot_agent(snapshot, *paths)
+            finally:
+                _run_gateway(data_dir, check_bootstrap=False)
+
+        if progress is not None:
+            progress.accept(3)
+        write_archive(snapshot, archive)
+
+
+def import_agent(data_dir: str, archive_path: str, progress=None) -> None:
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from agent_import import replace_agent, retarget_session_workspaces, unpack_archive, validate_database
+    from nanobot.config.loader import _migrate_config
+    from nanobot.config.schema import Config
+    from nanobot.session.sqlite_store import _SCHEMA_MIGRATIONS
+
+    with TemporaryDirectory(prefix=".agent-import-", dir=data_dir) as directory:
+        stage = Path(directory)
+        unpack_archive(Path(archive_path), stage)
+        config_file = stage / "config.json"
+        config = json.loads(config_file.read_text(encoding="utf-8"))
+        services = json.loads((stage / "alamp_config.json").read_text(encoding="utf-8"))
+        if not isinstance(config, dict) or not isinstance(services, dict):
+            raise ValueError("В архивах конфигурации ожидаются JSON-объекты")
+        imported_config = Config.model_validate(_migrate_config(json.loads(json.dumps(config))))
+        source_workspace = imported_config.agents.defaults.workspace
+        if progress is not None:
+            progress.accept(5)
+        validate_database(stage / "sessions.sqlite3", len(_SCHEMA_MIGRATIONS), os.getenv("SQLITE_VEC_SO_PATH"))
+
+        with _gateway_lock:
+            paths = _gateway_paths
+            if paths is None or _gateway_thread is None or not _gateway_thread.is_alive():
+                raise RuntimeError("Шлюз ещё не готов")
+            _retarget_import_config(config, paths[0])
+            Config.model_validate(_migrate_config(json.loads(json.dumps(config))))
+            config_file.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+            retarget_session_workspaces(
+                stage / "sessions.sqlite3", paths[0],
+                [source_workspace, *_legacy_workspaces(data_dir)],
+            )
+            if progress is not None:
+                progress.accept(6)
+            _gateway_stop.set()
+            _gateway_thread.join()
+            try:
+                replace_agent(stage, *paths)
+            finally:
+                _run_gateway(data_dir, check_bootstrap=False)
+
+
+def _retarget_import_config(config, workspace) -> None:
+    config.setdefault("agents", {}).setdefault("defaults", {})["workspace"] = str(workspace)
+    config.setdefault("channels", {}).setdefault("websocket", {})["port"] = _WEB_PORT
+    gateway = config.setdefault("gateway", {})
+    gateway["port"] = _HEALTH_PORT
+    gateway.pop("health", None)
+
+
+def _legacy_workspaces(data_dir: str):
+    from pathlib import Path
+
+    old_files = Path(data_dir).parent.with_name("com.alamp.app") / "files"
+    roots = {old_files}
+    if old_files == Path("/data/data/com.alamp.app/files"):
+        roots.add(Path("/data/user/0/com.alamp.app/files"))
+    elif old_files == Path("/data/user/0/com.alamp.app/files"):
+        roots.add(Path("/data/data/com.alamp.app/files"))
+    return [root / ".nanobot" / "workspace" for root in roots]
 
 
 def _extract_vec_so(data_dir: str) -> str | None:
@@ -104,23 +209,21 @@ def _extract_vec_so(data_dir: str) -> str | None:
 
 
 
-def _run_gateway(data_dir: str):
+def _run_gateway(data_dir: str, *, check_bootstrap: bool = True):
     """Создаёт конфиг и запускает шлюз."""
+    global _gateway_thread, _gateway_stop, _gateway_paths
+
+    stop = threading.Event()
+    _gateway_stop = stop
+    _gateway_paths = None
 
     nanobot_dir = os.path.join(data_dir, "nanobot")
     config_path = os.path.join(nanobot_dir, "config.json")
-    workspace_dir = os.path.join(nanobot_dir, "workspace")
 
     # Создаём директории
     os.makedirs(nanobot_dir, exist_ok=True)
-    os.makedirs(workspace_dir, exist_ok=True)
 
-    # --- Извлекаем vec0.so для sqlite-vec ---
-    vec_path = _extract_vec_so(data_dir)
-
-    # --- Проверяем, есть ли эмбеддинги в БД ---
-    # --- Путь к БД ---
-    os.environ["MEMORY_DB_PATH"] = os.path.join(nanobot_dir, "sessions.sqlite3")
+    _extract_vec_so(data_dir)
 
     # Создаём конфиг, если его нет
     if not os.path.exists(config_path):
@@ -164,16 +267,12 @@ def _run_gateway(data_dir: str):
                 "websocket": {
                     "enabled": True,
                     "host": "localhost",
-                    "port": 8765,
+                    "port": _WEB_PORT,
                     "websocket_requires_token": False
                 }
             },
             "gateway": {
-                "health": {
-                    "enabled": True,
-                    "host": "localhost",
-                    "port": 18790
-                },
+                "port": _HEALTH_PORT,
                 "heartbeat": {
                     "enabled": False
                 }
@@ -205,29 +304,18 @@ def _run_gateway(data_dir: str):
             json.dump(services, f, indent=2)
         print(f"Создан alamp_config.json (темплейт): {services_path}")
 
-    # Тест: загружаем конфиг и проверяем model_presets
-
-    # Регистрируем инструменты alamp_memory напрямую (Chaquopy не поддерживает entry_points)
-    try:
-        from alamp_memory.tool import MemoryRecallTool, MemoryRecallContextTool
-        from nanobot.agent.tools.registry import ToolRegistry
-        _reg = ToolRegistry()
-        _db = os.environ.get("MEMORY_DB_PATH", os.path.join(nanobot_dir, "sessions.sqlite3"))
-        _reg.register(MemoryRecallTool(db_path=_db))
-        _reg.register(MemoryRecallContextTool(db_path=_db))
-    except Exception as e:
-        _log_path = os.path.join(nanobot_dir, "alamp_register_error.log")
-        with open(_log_path, "w") as _f:
-            _f.write(f"alamp_memory register failed: {e}\n{traceback.format_exc()}")
-
     # Запускаем шлюз в фоновом потоке
     def run():
+        global _gateway_paths
         import traceback as _tb
         try:
             from pathlib import Path
+            from agent_import import retarget_session_workspaces
             from nanobot.config.loader import load_config, set_config_path
-            from nanobot.cli.gateway_runtime import _run_gateway
+            from nanobot.cli import gateway_runtime
             from nanobot.gateway.runtime import GatewayInstance
+            from nanobot.session.location import SessionLocation
+            from nanobot.session.sqlite_store import SqliteSessionStore
 
             # Устанавливаем SSL_CERT_FILE для Chaquopy (cacert.pem от certifi)
             _cert_path = os.path.join(data_dir, "chaquopy", "cacert.pem")
@@ -240,6 +328,17 @@ def _run_gateway(data_dir: str):
             set_config_path(Path(config_path))
 
             config_obj = load_config(Path(config_path))
+            websocket = getattr(config_obj.channels, "websocket", None)
+            if isinstance(websocket, dict):
+                websocket["port"] = _WEB_PORT
+            # SessionManager использует тот же workspace и тот же алгоритм выбора каталога.
+            location = SessionLocation(config_obj.workspace_path)
+            memory_db_path = SqliteSessionStore(location.sessions_dir).path
+            repaired_scopes = retarget_session_workspaces(
+                memory_db_path, location.workspace, _legacy_workspaces(data_dir),
+            )
+            os.environ["MEMORY_DB_PATH"] = str(memory_db_path)
+            os.environ["ALAMP_CONFIG_PATH"] = services_path
             # Создаём GatewayInstance с правильным config_path
             instance = GatewayInstance.resolve(config_path=config_path)
 
@@ -247,6 +346,8 @@ def _run_gateway(data_dir: str):
             _test_log = os.path.join(nanobot_dir, "pre_gateway_test.log")
             with open(_test_log, "w") as _f:
                 _f.write(f"config type: {type(config_obj)}\n")
+                _f.write(f"memory database: {memory_db_path}\n")
+                _f.write(f"repaired legacy session workspaces: {repaired_scopes}\n")
                 _f.write(f"model_presets keys: {list(config_obj.model_presets.keys())}\n")
                 _f.write(f"defaults.model_preset: {config_obj.agents.defaults.model_preset}\n")
                 _f.write(f"defaults.model: {config_obj.agents.defaults.model}\n")
@@ -258,7 +359,23 @@ def _run_gateway(data_dir: str):
                     import traceback as _tb2
                     _f.write(_tb2.format_exc())
 
-            _run_gateway(config_obj, gateway_instance=instance)
+            runtime_class = gateway_runtime.GatewayRuntime
+
+            class AndroidGatewayRuntime(runtime_class):
+                async def wait_for_shutdown_request(self, shutdown_event):
+                    global _gateway_paths
+                    _gateway_paths = (location.workspace, memory_db_path, Path(config_path), Path(services_path))
+                    while not stop.is_set():
+                        await asyncio.sleep(0.2)
+                    shutdown_event.set()
+
+            # Шлюз запущен в потоке Android. Запрашиваем остановку внутри его event loop.
+            gateway_runtime.GatewayRuntime = AndroidGatewayRuntime
+            try:
+                gateway_runtime._run_gateway(config_obj, port=_HEALTH_PORT, gateway_instance=instance)
+            finally:
+                gateway_runtime.GatewayRuntime = runtime_class
+                _gateway_paths = None
 
         except Exception as e:
             tb = _tb.format_exc()
@@ -266,8 +383,10 @@ def _run_gateway(data_dir: str):
             with open(log_path, "w") as f:
                 f.write(f"Runtime Error: {e}\n{tb}")
 
-    thread = threading.Thread(target=run, daemon=True)
-    thread.start()
+    _gateway_thread = threading.Thread(target=run, daemon=True)
+    _gateway_thread.start()
+    if not check_bootstrap:
+        return
 
     # Ждём запуска и проверяем bootstrap
     import time
@@ -275,7 +394,7 @@ def _run_gateway(data_dir: str):
     try:
         import urllib.request
         import json as _json
-        req = urllib.request.Request("http://localhost:8765/webui/bootstrap")
+        req = urllib.request.Request(f"http://localhost:{_WEB_PORT}/webui/bootstrap")
         resp = urllib.request.urlopen(req, timeout=5)
         bootstrap = _json.loads(resp.read())
         log_path = os.path.join(nanobot_dir, "bootstrap_check.log")
