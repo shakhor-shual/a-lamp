@@ -2,6 +2,11 @@ name: Android APK
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to build and publish (leave empty for artifact only)
+        required: false
+        type: string
   push:
     tags: ['v*']
 
@@ -15,6 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
           persist-credentials: false
       - uses: actions/setup-java@v4
         with:
@@ -25,7 +31,11 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install Android build tools
-        run: sdkmanager 'platforms;android-34' 'build-tools;34.0.0'
+        run: |
+          if [[ ! -f "$ANDROID_HOME/platforms/android-34/android.jar" ||
+                ! -x "$ANDROID_HOME/build-tools/34.0.0/apksigner" ]]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-34' 'build-tools;34.0.0'
+          fi
       - name: Build release APK
         run: |
           ./build_wheel.sh
@@ -57,7 +67,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' || inputs.release_tag != ''
     needs: build
     runs-on: ubuntu-24.04
     permissions:
@@ -71,7 +81,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
           gh release create "$RELEASE_TAG" --verify-tag --generate-notes \
             dist/AI-Lamp-arm64.apk dist/AI-Lamp-arm64.apk.sha256
