@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/gateway_startup"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/shell_surface"
+    android:clickable="true"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:importantForAccessibility="no"
+            android:src="@mipmap/ic_launcher" />
+
+        <ProgressBar
+            android:id="@+id/gateway_startup_progress"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginTop="20dp"
+            android:importantForAccessibility="no"
+            android:indeterminateTint="@color/shell_accent" />
+
+        <TextView
+            android:id="@+id/gateway_startup_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:accessibilityHeading="true"
+            android:accessibilityLiveRegion="polite"
+            android:gravity="center"
+            android:text="@string/app_starting"
+            android:textAppearance="?android:attr/textAppearanceLarge"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/gateway_startup_help"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:maxWidth="440dp"
+            android:text="@string/gateway_startup_help"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/gateway_startup_retry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/gateway_retry"
+            android:textAllCaps="false"
+            android:visibility="gone" />
+    </LinearLayout>
+</ScrollView>

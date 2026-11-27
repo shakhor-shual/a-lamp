@@ -12,6 +12,9 @@ import android.util.Log
 import android.view.MenuItem
 import android.view.View
 import android.webkit.WebView
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import androidx.appcompat.app.AlertDialog
 import android.webkit.WebViewClient
 import android.webkit.PermissionRequest
@@ -27,6 +30,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.isVisible
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -117,7 +121,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var shellSettings: View
     private lateinit var agentManagement: View
     private lateinit var voiceChat: VoiceChatPanel
-    private lateinit var tvStatus: TextView
+    private lateinit var startup: View
+    private lateinit var startupProgress: View
+    private lateinit var startupTitle: TextView
+    private lateinit var startupHelp: View
+    private lateinit var startupRetry: View
+    private var pageCommit: CompletableDeferred<Boolean>? = null
+    private var blankPage: CompletableDeferred<Unit>? = null
     private var ttsBridge: TtsBridge? = null
     private var ttsClient: TtsClient? = null
     private var ttsEnabled = true
@@ -126,6 +136,7 @@ class MainActivity : AppCompatActivity() {
     private var exportProgressJob: Job? = null
     private val AUDIO_PERMISSION_CODE = 1001
     private val healthClient = OkHttpClient.Builder()
+        .callTimeout(2, TimeUnit.SECONDS)
         .connectTimeout(2, TimeUnit.SECONDS)
         .readTimeout(2, TimeUnit.SECONDS)
         .build()
@@ -167,7 +178,11 @@ class MainActivity : AppCompatActivity() {
         drawerLayout.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             updateDrawerGestureArea()
         }
-        tvStatus = findViewById(R.id.tv_status)
+        startup = findViewById(R.id.gateway_startup)
+        startupProgress = findViewById(R.id.gateway_startup_progress)
+        startupTitle = findViewById(R.id.gateway_startup_title)
+        startupHelp = findViewById(R.id.gateway_startup_help)
+        startupRetry = findViewById(R.id.gateway_startup_retry)
         webView = findViewById(R.id.webview)
         agentManagement = findViewById(R.id.agent_management)
         findViewById<View>(R.id.agent_management_back).setOnClickListener { showAgentManagement(false) }
@@ -201,8 +216,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-
-        setStatus(getString(R.string.app_starting))
 
         navView.setNavigationItemSelectedListener { item ->
             drawerLayout.closeDrawer(navView)
@@ -464,20 +477,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setStatus(text: String) {
-        tvStatus.text = text
-        tvStatus.visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
-    }
-
     private fun setupWebView() {
         ttsBridge = TtsBridge(this) { isSpeaking ->
             runOnUiThread {
                 if (::voiceChat.isInitialized) voiceChat.onPlaybackChanged(isSpeaking)
-                if (isSpeaking) {
-                    setStatus(getString(R.string.app_speaking))
-                } else {
-                    setStatus("")
-                }
             }
         }
 
@@ -498,8 +501,30 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.webViewClient = object : WebViewClient() {
+            override fun onPageCommitVisible(view: WebView, url: String) {
+                if (isNanobotPage(url)) pageCommit?.complete(true)
+            }
+
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                if (request.isForMainFrame && isNanobotPage(request.url.toString())) {
+                    pageCommit?.complete(false)
+                }
+            }
+
+            override fun onReceivedHttpError(
+                view: WebView, request: WebResourceRequest, errorResponse: WebResourceResponse
+            ) {
+                if (request.isForMainFrame && isNanobotPage(request.url.toString())) {
+                    pageCommit?.complete(false)
+                }
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                if (url == "about:blank") {
+                    blankPage?.complete(Unit)
+                    return
+                }
                 webView.applyKeyboardSetting()
                 if (ttsEnabled) {
                     checkUrlAndAttach()
@@ -564,46 +589,70 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Ждёт готовности gateway, проверяя health endpoint.
-     * Проверяет каждые 2 секунды, максимум 30 попыток (60 секунд).
-     * Когда gateway готов — загружает WebUI.
-     */
     private fun waitForGateway(page: String = WEBUI_URL) {
         gatewayCheckJob?.cancel()
-        gatewayCheckJob = CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
-            var attempts = 0
-            val maxAttempts = 30
+        if (pageCommit != null || blankPage != null) webView.stopLoading()
+        pageCommit = null
+        blankPage = null
+        startup.isVisible = true
+        startupProgress.isVisible = true
+        startupTitle.setText(R.string.app_starting)
+        startupHelp.isVisible = false
+        startupRetry.isVisible = false
+        startupRetry.setOnClickListener {
+            startNanobotGateway()
+            waitForGateway(page)
+        }
 
-            while (attempts < maxAttempts) {
-                try {
-                    val request = Request.Builder()
-                        .url("http://127.0.0.1:18791/health")
-                        .build()
-                    val response = healthClient.newCall(request).execute()
-                    val body = response.body?.string() ?: ""
-
-                    if (body.contains("\"ready\": true") || body.contains("\"websocket\": \"running\"")) {
-                        withContext(Dispatchers.Main) {
-                            setStatus(getString(R.string.app_loading))
-                            webView.loadUrl(page)
+        gatewayCheckJob = CoroutineScope(Dispatchers.Main).launch {
+            val loaded = withTimeoutOrNull(60_000) {
+                var committed = false
+                while (!committed) {
+                    if (withContext(Dispatchers.IO) { gatewayIsReady() }) {
+                        startupTitle.setText(R.string.app_loading)
+                        if (webView.url?.let(::isNanobotPage) == true) {
+                            // A fragment-only navigation would not commit a new document.
+                            val cleared = CompletableDeferred<Unit>()
+                            blankPage = cleared
+                            webView.loadUrl("about:blank")
+                            cleared.await()
+                            blankPage = null
                         }
-                        return@launch
+                        val pending = CompletableDeferred<Boolean>()
+                        pageCommit = pending
+                        webView.loadUrl(page)
+                        committed = pending.await()
                     }
-                } catch (e: Exception) {
-                    // Gateway ещё не готов — продолжаем ждать
+                    if (!committed) delay(2_000)
                 }
-
-                attempts++
-                delay(2000)
-            }
-
-            // Таймаут — gateway не запустился
-            withContext(Dispatchers.Main) {
-                setStatus(getString(R.string.gateway_not_started))
-                Toast.makeText(this@MainActivity, getString(R.string.gateway_timeout), Toast.LENGTH_LONG).show()
+                true
+            } == true
+            pageCommit = null
+            blankPage = null
+            if (loaded) {
+                startup.isVisible = false
+            } else {
+                webView.stopLoading()
+                startupProgress.isVisible = false
+                startupTitle.setText(R.string.gateway_timeout)
+                startupHelp.isVisible = true
+                startupRetry.isVisible = true
             }
         }
+    }
+
+    private fun gatewayIsReady(): Boolean = try {
+        val request = Request.Builder().url("http://127.0.0.1:18791/health").build()
+        healthClient.newCall(request).execute().use { response ->
+            if (response.isSuccessful) {
+                val body = JSONObject(response.body?.string().orEmpty())
+                body.optBoolean("ready") || body.optString("websocket") == "running"
+            } else false
+        }
+    } catch (_: IOException) {
+        false
+    } catch (_: org.json.JSONException) {
+        false
     }
 
     private fun extractChatId(url: String): String? {
@@ -670,9 +719,7 @@ class MainActivity : AppCompatActivity() {
                     Python.getInstance().getModule("start_gateway").callAttr("start_gateway", dataDir)
                 }
             } catch (e: Exception) {
-                if (!isDestroyed) {
-                    Toast.makeText(this@MainActivity, getString(R.string.gateway_error), Toast.LENGTH_LONG).show()
-                }
+                Log.w("AI-Lamp", "Gateway startup failed (${e.javaClass.simpleName})")
             }
         }
     }

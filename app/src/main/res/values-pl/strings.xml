@@ -159,7 +159,6 @@
     <string name="archive_replace">4 z 4 · Zastępowanie danych i ponowne uruchamianie bramy…</string>
     <string name="archive_import_confirm">Archiwum zastąpi bieżącą historię, ustawienia, prompty i pamięć agenta. Kontynuować?</string>
     <string name="archive_replace_button">Zastąp dane</string>
-    <string name="app_starting">🔄 Uruchamianie…</string>
     <string name="voice_open_chat">Otwórz nowy lub istniejący czat Nanobota</string>
     <string name="archive_reading">1 z 4 · Odczytywanie archiwum…</string>
     <string name="archive_unpack">2 z 4 · Rozpakowywanie i sprawdzanie ZIP…</string>
@@ -172,11 +171,6 @@
     <string name="archive_writing">4 z 4 · Zapisywanie w wybranej lokalizacji…</string>
     <string name="archive_exported">Zapisano ZIP w wybranej lokalizacji</string>
     <string name="archive_export_failed">Eksport się nie powiódł. Sprawdź wolne miejsce i dostęp do wybranego folderu.</string>
-    <string name="app_speaking">🧞 Odczytywanie…</string>
-    <string name="app_loading">✅ Wczytywanie…</string>
-    <string name="gateway_not_started">❌ Nie udało się uruchomić bramy</string>
-    <string name="gateway_timeout">Brama nie odpowiedziała w ciągu 60 sekund</string>
-    <string name="gateway_error">Błąd bramy</string>
     <string name="archive_finishing">4 z 4 · Kończenie zapisu…</string>
     <string name="about_title">O aplikacji</string>
     <string name="about_description">AI-Lamp to system agentowy przeniesiony na Androida, oparty na Nanobot %1$s.</string>
@@ -186,4 +180,9 @@
     <string name="text_size_sample">Przykładowy tekst</string>
     <string name="text_size_percent">%1$s · %2$d%%</string>
     <string name="text_size_sp">%1$s · %2$d sp</string>
+    <string name="app_starting">Uruchamianie Nanobota…</string>
+    <string name="app_loading">Otwieranie czatu…</string>
+    <string name="gateway_timeout">Nanobot nie otworzył się w ciągu 60 sekund</string>
+    <string name="gateway_startup_help">Spróbuj ponownie. Jeśli problem się powtórzy i masz kopię agenta, zainstaluj AI-Lamp ponownie i zaimportuj kopię w ustawieniach agenta.</string>
+    <string name="gateway_retry">Spróbuj ponownie</string>
 </resources>

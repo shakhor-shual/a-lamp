@@ -16,20 +16,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <!-- Индикатор статуса внизу -->
-        <TextView
-            android:id="@+id/tv_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="8dp"
-            android:textSize="12sp"
-            android:textColor="#888888"
-            android:background="#88000000"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="4dp"
-            android:visibility="gone" />
-
+        <include layout="@layout/gateway_startup" />
         <include layout="@layout/agent_management" />
         <include layout="@layout/shell_settings" />
         <include layout="@layout/voice_chat" />

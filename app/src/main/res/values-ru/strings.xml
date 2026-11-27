@@ -159,7 +159,6 @@
     <string name="archive_replace">4 из 4 · Замена данных и перезапуск шлюза…</string>
     <string name="archive_import_confirm">Архив полностью заменит текущую историю, настройки, промпты и память агента. Продолжить?</string>
     <string name="archive_replace_button">Заменить данные</string>
-    <string name="app_starting">🔄 Запуск...</string>
     <string name="voice_open_chat">Открой новый или существующий диалог Nanobot</string>
     <string name="archive_reading">1 из 4 · Чтение архива…</string>
     <string name="archive_unpack">2 из 4 · Распаковка и проверка ZIP…</string>
@@ -172,11 +171,6 @@
     <string name="archive_writing">4 из 4 · Запись в выбранное место…</string>
     <string name="archive_exported">ZIP передан в выбранное место</string>
     <string name="archive_export_failed">Экспорт не завершён. Проверь свободное место и доступ к выбранной папке.</string>
-    <string name="app_speaking">🧞 говорит...</string>
-    <string name="app_loading">✅ Загружаю...</string>
-    <string name="gateway_not_started">❌ Gateway не запустился</string>
-    <string name="gateway_timeout">Gateway не отвечает после 60с</string>
-    <string name="gateway_error">Ошибка шлюза</string>
     <string name="archive_finishing">4 из 4 · Завершение записи…</string>
     <string name="about_title">О приложении</string>
     <string name="about_description">AI-Lamp — агентская система на основе Nanobot %1$s, портированная на Android.</string>
@@ -186,4 +180,9 @@
     <string name="text_size_sample">Пример текста</string>
     <string name="text_size_percent">%1$s · %2$d%%</string>
     <string name="text_size_sp">%1$s · %2$d sp</string>
+    <string name="app_starting">Запускаем Nanobot…</string>
+    <string name="app_loading">Открываем чат…</string>
+    <string name="gateway_timeout">Nanobot не открылся за 60 секунд</string>
+    <string name="gateway_startup_help">Попробуй запустить ещё раз. Если проблема повторится и у тебя есть архив агента, переустанови AI-Lamp и импортируй архив через «Настройки агента».</string>
+    <string name="gateway_retry">Повторить запуск</string>
 </resources>

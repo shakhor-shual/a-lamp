@@ -160,7 +160,6 @@
     <string name="archive_replace">4 of 4 · Replacing data and restarting gateway…</string>
     <string name="archive_import_confirm">The archive will replace the current history, settings, prompts and memory. Continue?</string>
     <string name="archive_replace_button">Replace data</string>
-    <string name="app_starting">🔄 Starting…</string>
     <string name="voice_open_chat">Open a new or existing Nanobot chat</string>
     <string name="archive_reading">1 of 4 · Reading archive…</string>
     <string name="archive_unpack">2 of 4 · Extracting and checking ZIP…</string>
@@ -173,11 +172,6 @@
     <string name="archive_writing">4 of 4 · Writing to selected location…</string>
     <string name="archive_exported">ZIP saved to the selected location</string>
     <string name="archive_export_failed">Export failed. Check available space and access to the selected folder.</string>
-    <string name="app_speaking">🧞 Speaking…</string>
-    <string name="app_loading">✅ Loading…</string>
-    <string name="gateway_not_started">❌ Gateway failed to start</string>
-    <string name="gateway_timeout">Gateway did not respond within 60 seconds</string>
-    <string name="gateway_error">Gateway error</string>
     <string name="archive_finishing">4 of 4 · Finishing write…</string>
     <string name="about_title">About</string>
     <string name="about_description">AI-Lamp is an agent system based on Nanobot %1$s, ported to Android.</string>
@@ -188,4 +182,9 @@
     <string name="text_size_sample">Sample text</string>
     <string name="text_size_percent">%1$s · %2$d%%</string>
     <string name="text_size_sp">%1$s · %2$d sp</string>
+    <string name="app_starting">Starting Nanobot…</string>
+    <string name="app_loading">Opening the chat…</string>
+    <string name="gateway_timeout">Nanobot did not open within 60 seconds</string>
+    <string name="gateway_startup_help">Try again. If the problem persists and you have an agent backup, reinstall AI-Lamp and import the backup from Agent settings.</string>
+    <string name="gateway_retry">Try again</string>
 </resources>
