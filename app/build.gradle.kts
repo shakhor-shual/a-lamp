@@ -39,7 +39,7 @@ android {
 chaquopy {
     defaultConfig {
         version = "3.12"
-        buildPython("/usr/bin/python3")
+        buildPython(providers.environmentVariable("CHAQUOPY_BUILD_PYTHON").getOrElse("/usr/bin/python3"))
         pip {
             // Нативные wheels для Android arm64-v8a (API 24+)
             install("./pydantic_core-2.41.5-cp312-cp312-android_24_arm64_v8a.whl")
@@ -70,16 +70,22 @@ chaquopy {
 // Workaround: Chaquopy не всегда кладёт native .so в ABI-директорию.
 // Копируем .so из common/ в arm64-v8a/ после установки wheel.
 afterEvaluate {
-    val copySo by tasks.registering(Exec::class) {
-        dependsOn("installDebugPythonRequirements")
-        workingDir(layout.buildDirectory.dir("python/pip/debug").get().asFile)
-        commandLine("bash", "-c", "cd common && for f in \$(find . -name '*.so'); do mkdir -p ../arm64-v8a/\$(dirname \$f) && cp \$f ../arm64-v8a/\$f; done")
-    }
-    tasks.named("generateDebugPythonRequirementsAssets") {
-        dependsOn(copySo)
-    }
-    tasks.named("generateDebugPythonProxies") {
-        dependsOn(copySo)
+    for (variant in listOf("Debug", "Release")) {
+        val variantDirectory = variant.lowercase()
+        val copySo = tasks.register<Exec>("copy${variant}PythonLibraries") {
+            dependsOn("install${variant}PythonRequirements")
+            workingDir(layout.buildDirectory.dir("python/pip/$variantDirectory").get().asFile)
+            commandLine(
+                "bash", "-c",
+                "cd common && for f in \$(find . -name '*.so'); do mkdir -p ../arm64-v8a/\$(dirname \$f) && cp \$f ../arm64-v8a/\$f; done"
+            )
+        }
+        tasks.named("generate${variant}PythonRequirementsAssets") {
+            dependsOn(copySo)
+        }
+        tasks.named("generate${variant}PythonProxies") {
+            dependsOn(copySo)
+        }
     }
 }
 

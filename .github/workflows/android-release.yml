@@ -1,0 +1,77 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Android build tools
+        run: sdkmanager 'platforms;android-34' 'build-tools;34.0.0'
+      - name: Build release APK
+        run: |
+          ./build_wheel.sh
+          CHAQUOPY_BUILD_PYTHON="$(command -v python3)" ./gradlew --no-daemon :app:assembleRelease
+      - name: Sign and verify APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${KEYSTORE_BASE64:?Missing release keystore}" "${KEYSTORE_PASSWORD:?Missing release keystore password}"
+          umask 077
+          keystore="$(mktemp)"
+          trap 'rm -f "$keystore"' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          tools="$ANDROID_HOME/build-tools/34.0.0"
+          mkdir -p dist
+          "$tools/apksigner" sign --ks "$keystore" --ks-key-alias ai-lamp-release \
+            --ks-pass env:KEYSTORE_PASSWORD --out dist/AI-Lamp-arm64.apk \
+            app/build/outputs/apk/release/app-release-unsigned.apk
+          "$tools/apksigner" verify --print-certs dist/AI-Lamp-arm64.apk
+          (cd dist && sha256sum AI-Lamp-arm64.apk > AI-Lamp-arm64.apk.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AI-Lamp-arm64
+          path: |
+            dist/AI-Lamp-arm64.apk
+            dist/AI-Lamp-arm64.apk.sha256
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: AI-Lamp-arm64
+          path: dist
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" --verify-tag --generate-notes \
+            dist/AI-Lamp-arm64.apk dist/AI-Lamp-arm64.apk.sha256
