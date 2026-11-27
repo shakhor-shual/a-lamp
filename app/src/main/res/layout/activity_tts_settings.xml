@@ -9,21 +9,23 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <ImageButton
-            android:id="@+id/voice_back"
-            style="@style/EditorAction"
-            android:contentDescription="Назад к чату"
-            android:src="@android:drawable/ic_menu_revert" />
+        android:layoutDirection="ltr"
+        android:orientation="horizontal"
+        android:paddingLeft="16dp">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:accessibilityHeading="true"
-            android:text="@string/voice_settings_title"
+            android:text="@string/tts_heading"
             android:textAppearance="?android:attr/textAppearanceLarge" />
+
+        <ImageButton
+            android:id="@+id/voice_back"
+            style="@style/EditorAction"
+            android:contentDescription="@string/back_to_settings"
+            android:src="@drawable/ic_shell_close" />
 
     </LinearLayout>
 
@@ -39,36 +41,32 @@
             android:paddingHorizontal="12dp"
             android:paddingBottom="12dp">
 
-            <TextView
-                style="@style/ShellSectionHeading"
-                android:text="Озвучка · TTS" />
-
             <androidx.appcompat.widget.SwitchCompat
                 android:id="@+id/voice_enabled"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:minHeight="52dp"
                 android:paddingHorizontal="12dp"
-                android:text="Озвучивать ответы"
+                android:text="@string/tts_enabled"
                 android:textAppearance="?android:attr/textAppearanceMedium" />
 
             <Button
                 android:id="@+id/voice_engine"
                 style="@style/ShellAction"
                 android:drawableStart="@android:drawable/ic_menu_preferences"
-                android:text="Движок" />
+                android:text="@string/tts_engine" />
 
             <Button
                 android:id="@+id/voice_language"
                 style="@style/ShellAction"
                 android:drawableStart="@android:drawable/ic_menu_myplaces"
-                android:text="Язык" />
+                android:text="@string/tts_language" />
 
             <Button
                 android:id="@+id/voice_selection"
                 style="@style/ShellAction"
                 android:drawableStart="@android:drawable/ic_btn_speak_now"
-                android:text="Голос" />
+                android:text="@string/tts_voice" />
 
             <TextView
                 android:id="@+id/voice_rate_label"
@@ -78,7 +76,7 @@
                 android:id="@+id/voice_rate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:contentDescription="Скорость речи" />
+                android:contentDescription="@string/tts_rate" />
 
             <TextView
                 android:id="@+id/voice_pitch_label"
@@ -88,45 +86,25 @@
                 android:id="@+id/voice_pitch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:contentDescription="Высота тона" />
+                android:contentDescription="@string/tts_pitch" />
 
             <Button
                 android:id="@+id/voice_preview"
                 style="@style/ShellAction"
                 android:drawableStart="@android:drawable/ic_media_play"
-                android:text="Прослушать пример" />
+                android:text="@string/tts_preview" />
 
             <Button
                 android:id="@+id/voice_data"
                 style="@style/ShellAction"
                 android:drawableStart="@android:drawable/ic_menu_save"
-                android:text="Загрузить голоса" />
+                android:text="@string/tts_download" />
 
             <TextView
                 android:id="@+id/voice_status"
                 style="@style/ShellSectionHeading"
                 android:accessibilityLiveRegion="polite"
                 android:visibility="gone" />
-
-            <TextView
-                style="@style/ShellSectionHeading"
-                android:text="Распознавание речи · STT" />
-
-            <androidx.appcompat.widget.SwitchCompat
-                android:id="@+id/voice_hide_keyboard"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="52dp"
-                android:paddingHorizontal="12dp"
-                android:text="Скрывать экранную клавиатуру в чате"
-                android:textAppearance="?android:attr/textAppearanceMedium" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingStart="12dp"
-                android:paddingTop="6dp"
-                android:text="Голосовой ввод в оболочке готовится." />
 
         </LinearLayout>
     </ScrollView>

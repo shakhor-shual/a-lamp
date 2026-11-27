@@ -11,13 +11,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <ImageButton
-            android:id="@+id/agent_management_back"
-            style="@style/EditorAction"
-            android:contentDescription="Назад к чату"
-            android:src="@android:drawable/ic_menu_revert" />
+        android:layoutDirection="ltr"
+        android:orientation="horizontal"
+        android:paddingLeft="16dp">
 
         <TextView
             android:layout_width="0dp"
@@ -26,6 +22,12 @@
             android:accessibilityHeading="true"
             android:text="@string/agent_management_title"
             android:textAppearance="?android:attr/textAppearanceLarge" />
+
+        <ImageButton
+            android:id="@+id/agent_management_back"
+            style="@style/EditorAction"
+            android:contentDescription="@string/back_to_chat"
+            android:src="@drawable/ic_shell_close" />
 
     </LinearLayout>
 
@@ -67,35 +69,35 @@
 
             <TextView
                 style="@style/ShellSectionHeading"
-                android:text="Архив агента" />
+                android:text="@string/agent_archive" />
 
             <Button
                 android:id="@+id/agent_management_export"
                 style="@style/ShellAction"
                 android:drawableStart="@android:drawable/ic_menu_upload"
-                android:text="Экспорт агента" />
+                android:text="@string/agent_export" />
 
             <Button
                 android:id="@+id/agent_management_import"
                 style="@style/ShellAction"
                 android:drawableStart="@android:drawable/ic_menu_save"
-                android:text="Импорт агента" />
+                android:text="@string/agent_import" />
 
             <TextView
                 style="@style/ShellSectionHeading"
-                android:text="Файлы агента" />
+                android:text="@string/agent_files" />
 
             <Button
                 android:id="@+id/agent_management_configs"
                 style="@style/ShellAction"
                 android:drawableStart="@android:drawable/ic_menu_preferences"
-                android:text="Конфиги" />
+                android:text="@string/agent_configs" />
 
             <Button
                 android:id="@+id/agent_management_prompts"
                 style="@style/ShellAction"
                 android:drawableStart="@android:drawable/ic_menu_edit"
-                android:text="Промпты" />
+                android:text="@string/agent_prompts" />
 
         </LinearLayout>
     </ScrollView>

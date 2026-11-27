@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/shell_surface"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layoutDirection="ltr"
+        android:orientation="horizontal"
+        android:paddingLeft="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:accessibilityHeading="true"
+            android:text="@string/shell_text_size"
+            android:textAppearance="?android:attr/textAppearanceLarge" />
+
+        <ImageButton
+            android:id="@+id/text_size_back"
+            style="@style/EditorAction"
+            android:contentDescription="@string/back_to_settings"
+            android:src="@drawable/ic_shell_close" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:divider="?android:attr/listDivider"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:showDividers="middle">
+
+            <include android:id="@+id/text_size_web" layout="@layout/text_size_control" />
+            <include android:id="@+id/text_size_dictation" layout="@layout/text_size_control" />
+            <include android:id="@+id/text_size_reply" layout="@layout/text_size_control" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

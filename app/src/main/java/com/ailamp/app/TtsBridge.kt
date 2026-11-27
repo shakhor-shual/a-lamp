@@ -13,15 +13,21 @@ class TtsBridge(
     private val context: Context,
     private val onSpeakingChange: (Boolean) -> Unit
 ) {
+    private data class Speech(val text: String, val onFinished: ((Boolean) -> Unit)? = null)
+    private data class Playback(val pending: MutableSet<String>, val onFinished: (Boolean) -> Unit)
+
     private val main = Handler(Looper.getMainLooper())
     private val preferences = VoiceSettings.preferences(context)
     private var settings = VoiceSettings.read(context)
     private var tts: TextToSpeech? = null
     private var generation = 0
     private var ready = false
+    private var engineFailed = false
     private var destroyed = false
+    private var voiceChat = false
     @Volatile private var speaking = false
-    private val queue = ArrayDeque<String>()
+    private val queue = ArrayDeque<Speech>()
+    private var playback: Playback? = null
 
     init {
         startEngine()
@@ -30,6 +36,7 @@ class TtsBridge(
     private fun startEngine() {
         val current = ++generation
         ready = false
+        engineFailed = false
         stopSpeaking(clearPending = false)
         tts?.shutdown()
         val engine = TextToSpeech(context, { result ->
@@ -40,21 +47,39 @@ class TtsBridge(
                     tts?.let(settings::applyTo)
                     flushQueue()
                 } else {
+                    engineFailed = true
+                    val pending = queue.toList()
                     queue.clear()
                     Log.w("TtsBridge", "TTS initialization failed ($result)")
+                    pending.forEach { it.onFinished?.invoke(false) }
                 }
             }
         }, settings.engine)
         tts = engine
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) = updateSpeaking(true)
-            override fun onDone(utteranceId: String?) = updateSpeaking(false)
-            override fun onError(utteranceId: String?) = updateSpeaking(false)
+            override fun onDone(utteranceId: String?) = finishUtterance(utteranceId, true)
+            override fun onError(utteranceId: String?) = finishUtterance(utteranceId, false)
+            override fun onStop(utteranceId: String?, interrupted: Boolean) = finishUtterance(utteranceId, false)
+
+            private fun finishUtterance(id: String?, success: Boolean) {
+                main.post {
+                    if (current != generation || destroyed) return@post
+                    val currentPlayback = playback
+                    if (id != null && currentPlayback?.pending?.remove(id) == true &&
+                        (!success || currentPlayback.pending.isEmpty())
+                    ) {
+                        playback = null
+                        currentPlayback.onFinished(success)
+                    }
+                    setSpeaking((settings.enabled || voiceChat) && tts?.isSpeaking == true)
+                }
+            }
 
             private fun updateSpeaking(active: Boolean) {
                 main.post {
                     if (current == generation && !destroyed) {
-                        setSpeaking(settings.enabled && (active || tts?.isSpeaking == true))
+                        setSpeaking((settings.enabled || voiceChat) && (active || tts?.isSpeaking == true))
                     }
                 }
             }
@@ -66,7 +91,7 @@ class TtsBridge(
         if (settings == updated || destroyed) return
         val engineChanged = settings.engine != updated.engine
         settings = updated
-        if (!settings.enabled) stopSpeaking()
+        if (!settings.enabled && !voiceChat) stopSpeaking()
         if (engineChanged) {
             startEngine()
         } else if (ready) {
@@ -74,13 +99,29 @@ class TtsBridge(
         }
     }
 
+    fun setVoiceChat(active: Boolean) {
+        voiceChat = active
+        stopSpeaking()
+    }
+
+    fun speakVoiceReply(text: String, onFinished: (Boolean) -> Unit) {
+        val clean = cleanTextForTts(text)
+        if (!voiceChat || destroyed || engineFailed || clean.isBlank()) {
+            onFinished(false)
+            return
+        }
+        queue.addLast(Speech(clean, onFinished))
+        flushQueue()
+    }
+
     @JavascriptInterface
     fun speak(text: String) {
         val clean = cleanTextForTts(text)
         if (clean.isBlank()) return
         main.post {
-            if (!destroyed && settings.enabled) {
-                queue.addLast(clean)
+            if (!destroyed && (settings.enabled || voiceChat)) {
+                if (engineFailed) return@post
+                queue.addLast(Speech(clean))
                 flushQueue()
             }
         }
@@ -109,7 +150,8 @@ class TtsBridge(
 
     @JavascriptInterface
     fun stop() {
-        main.post { stopSpeaking() }
+        if (Looper.myLooper() == Looper.getMainLooper()) stopSpeaking()
+        else main.post { stopSpeaking() }
     }
 
     @JavascriptInterface
@@ -123,6 +165,7 @@ class TtsBridge(
     }
 
     private fun stopSpeaking(clearPending: Boolean = true) {
+        playback = null
         tts?.stop()
         if (clearPending) queue.clear()
         setSpeaking(false)
@@ -130,14 +173,28 @@ class TtsBridge(
 
     private fun flushQueue() {
         val engine = tts ?: return
-        if (!ready || !settings.enabled) return
+        if (!ready || !(settings.enabled || voiceChat)) return
         while (queue.isNotEmpty()) {
-            val paragraphs = queue.removeFirst().split(Regex("""\n\s*\n"""))
+            val speech = queue.removeFirst()
+            val pending = mutableSetOf<String>()
+            val paragraphs = speech.text.split(Regex("""\n\s*\n"""))
+            var failed = false
             paragraphs.filter { it.isNotBlank() }.forEachIndexed { index, paragraph ->
                 if (index > 0) {
                     engine.playSilentUtterance(600, TextToSpeech.QUEUE_ADD, UUID.randomUUID().toString())
                 }
-                engine.speak(paragraph, TextToSpeech.QUEUE_ADD, null, UUID.randomUUID().toString())
+                for (chunk in paragraph.chunked(TextToSpeech.getMaxSpeechInputLength())) {
+                    val id = UUID.randomUUID().toString()
+                    if (engine.speak(chunk, TextToSpeech.QUEUE_ADD, null, id) == TextToSpeech.SUCCESS) {
+                        if (speech.onFinished != null) pending.add(id)
+                    } else {
+                        failed = true
+                    }
+                }
+            }
+            speech.onFinished?.let { completion ->
+                if (failed || pending.isEmpty()) completion(false)
+                else playback = Playback(pending, completion)
             }
         }
     }

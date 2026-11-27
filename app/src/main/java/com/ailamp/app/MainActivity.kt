@@ -3,6 +3,8 @@ package com.ailamp.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -15,13 +17,18 @@ import android.webkit.WebViewClient
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.widget.TextView
+import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.view.GravityCompat
+import androidx.core.os.LocaleListCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.navigation.NavigationView
 import com.chaquo.python.Python
@@ -30,6 +37,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.net.URLDecoder
@@ -41,16 +49,16 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AppCompatActivity() {
 
-    private data class ExportProgress(val label: String, val percent: Int? = null)
+    private data class ExportProgress(val label: Int, val percent: Int? = null)
 
     class ExportStageReporter {
         fun accept(stage: Int) {
             val label = when (stage) {
-                1 -> "1 из 4 · Остановка шлюза…"
-                2 -> "2 из 4 · Снимок базы и файлов агента…"
-                3 -> "3 из 4 · Упаковка ZIP…"
-                5 -> "3 из 4 · Проверка базы SQLite…"
-                6 -> "4 из 4 · Замена данных и перезапуск шлюза…"
+                1 -> R.string.archive_stop_gateway
+                2 -> R.string.archive_snapshot
+                3 -> R.string.archive_pack
+                5 -> R.string.archive_check_db
+                6 -> R.string.archive_replace
                 else -> return
             }
             exportProgress.value = ExportProgress(label)
@@ -59,6 +67,10 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val MANAGEMENT_OPEN = "agent_management_open"
+        private const val SETTINGS_OPEN = "shell_settings_open"
+        private const val WEBUI_URL_STATE = "webui_url"
+        private const val WEBUI_URL = "http://localhost:8766/webui/"
+        private val appLanguages = listOf("en" to "English", "ru" to "Русский", "pl" to "Polski")
         private val exportInProgress = AtomicBoolean(false)
         private val exportProgress = MutableStateFlow<ExportProgress?>(null)
     }
@@ -72,10 +84,10 @@ class MainActivity : AppCompatActivity() {
     private val importSource = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             AlertDialog.Builder(this)
-                .setTitle("Импорт агента")
-                .setMessage("Архив полностью заменит текущую историю, настройки, промпты и память агента. Продолжить?")
-                .setNegativeButton("Отмена", null)
-                .setPositiveButton("Заменить данные") { _, _ -> importAgent(uri) }
+                .setTitle(getString(R.string.agent_import))
+                .setMessage(getString(R.string.archive_import_confirm))
+                .setNegativeButton(getString(R.string.cancel), null)
+                .setPositiveButton(getString(R.string.archive_replace_button)) { _, _ -> importAgent(uri) }
                 .show()
         }
     }
@@ -88,10 +100,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val speechSettings = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) openVoiceChat()
+    }
+
+    private val voicePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (voiceChat.isOpen) {
+            if (granted) voiceChat.startListening()
+            else voiceChat.showPermissionError()
+        }
+    }
+
     private lateinit var webView: ChatWebView
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var navView: NavigationView
+    private lateinit var shellSettings: View
     private lateinit var agentManagement: View
+    private lateinit var voiceChat: VoiceChatPanel
     private lateinit var tvStatus: TextView
     private var ttsBridge: TtsBridge? = null
     private var ttsClient: TtsClient? = null
@@ -115,6 +140,33 @@ class MainActivity : AppCompatActivity() {
 
         drawerLayout = findViewById(R.id.drawer_layout)
         navView = findViewById(R.id.nav_view)
+        shellSettings = findViewById(R.id.shell_settings)
+        findViewById<View>(R.id.shell_settings_back).setOnClickListener { showShellSettings(false) }
+        findViewById<Button>(R.id.shell_settings_language).apply {
+            val current = AppCompatDelegate.getApplicationLocales().get(0)?.language
+            val name = appLanguages.firstOrNull { it.first == current }?.second
+                ?: getString(R.string.app_language_system)
+            text = getString(R.string.app_language_current, name)
+            setOnClickListener { chooseAppLanguage() }
+        }
+        findViewById<View>(R.id.shell_settings_text_size).setOnClickListener {
+            startActivity(Intent(this, TextSizeSettingsActivity::class.java))
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
+        findViewById<View>(R.id.shell_settings_stt).setOnClickListener {
+            speechSettings.launch(Intent(this, SttSettingsActivity::class.java))
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
+        findViewById<View>(R.id.shell_settings_tts).setOnClickListener {
+            startActivity(Intent(this, TtsSettingsActivity::class.java))
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
+        drawerLayout.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            updateDrawerGestureArea()
+        }
         tvStatus = findViewById(R.id.tv_status)
         webView = findViewById(R.id.webview)
         agentManagement = findViewById(R.id.agent_management)
@@ -131,7 +183,10 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener { if (!exportInProgress.get()) action() }
             }
         }
-        showAgentManagement(savedInstanceState?.getBoolean(MANAGEMENT_OPEN) == true)
+        when {
+            savedInstanceState?.getBoolean(MANAGEMENT_OPEN) == true -> showAgentManagement(true)
+            savedInstanceState?.getBoolean(SETTINGS_OPEN) == true -> showShellSettings(true)
+        }
         val exportPanel = findViewById<View>(R.id.export_progress_panel)
         val exportLabel = findViewById<TextView>(R.id.export_progress_label)
         val exportBar = findViewById<ProgressBar>(R.id.export_progress_bar)
@@ -140,17 +195,17 @@ class MainActivity : AppCompatActivity() {
                 exportPanel.visibility = if (progress == null) View.GONE else View.VISIBLE
                 actions.forEach { it.isEnabled = progress == null }
                 if (progress != null) {
-                    exportLabel.text = progress.label
+                    exportLabel.setText(progress.label)
                     exportBar.isIndeterminate = progress.percent == null
                     progress.percent?.let { exportBar.progress = it }
                 }
             }
         }
 
-        setStatus("🔄 Запуск...")
+        setStatus(getString(R.string.app_starting))
 
         navView.setNavigationItemSelectedListener { item ->
-            drawerLayout.closeDrawer(GravityCompat.START)
+            drawerLayout.closeDrawer(navView)
             handleMenuItem(item)
             true
         }
@@ -160,30 +215,114 @@ class MainActivity : AppCompatActivity() {
         }
         ttsEnabled = VoiceSettings.read(this).enabled
         setupWebView()
+        voiceChat = VoiceChatPanel(
+            this, findViewById(R.id.voice_chat), ::closeVoiceChat, ::startVoiceInput,
+            stopSpeaking = { ttsBridge?.stop() },
+            speak = { text, onFinished ->
+                val bridge = ttsBridge
+                if (bridge == null) onFinished(false) else bridge.speakVoiceReply(text, onFinished)
+            },
+        )
         requestAudioPermission()
         startNanobotGateway()
-        waitForGateway()
+        val previousPage = savedInstanceState?.getString(WEBUI_URL_STATE)?.takeIf(::isNanobotPage)
+        waitForGateway(previousPage ?: WEBUI_URL)
     }
 
     private fun handleMenuItem(item: MenuItem) {
         when (item.itemId) {
-            R.id.action_voice -> {
-                startActivity(Intent(this, TtsSettingsActivity::class.java))
+            R.id.action_voice_chat -> openVoiceChat()
+            R.id.action_agent_management -> showAgentManagement(true)
+            R.id.action_shell_settings -> showShellSettings(true)
+            R.id.action_about -> AlertDialog.Builder(this)
+                .setTitle(R.string.about_title)
+                .setMessage(getString(R.string.about_description, getString(R.string.about_nanobot_version)))
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            R.id.action_service_diagnostics -> {
+                startActivity(Intent(this, ServiceDiagnosticsActivity::class.java))
                 @Suppress("DEPRECATION")
                 overridePendingTransition(0, 0)
             }
-            R.id.action_agent_management -> showAgentManagement(true)
-            R.id.action_diagnostics -> Toast.makeText(this, "Диагностика — скоро", Toast.LENGTH_SHORT).show()
-            R.id.action_font_size -> showFontSizeDialog()
+        }
+    }
+
+    private fun openVoiceChat() {
+        if (voiceChat.isOpen) return
+        val url = webView.url ?: return
+        val uri = Uri.parse(url)
+        val route = uri.encodedFragment.orEmpty()
+        val isNewChat = route in setOf("", "/", "/new")
+        val chatId = if (route.startsWith("/chat/")) extractChatId(url) else null
+        if (!isNanobotPage(url) || (chatId == null && !isNewChat)) {
+            Toast.makeText(this, getString(R.string.voice_open_chat), Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (shellSettings.visibility == View.VISIBLE) showShellSettings(false)
+        ttsClient?.stop()
+        lastChatId = null
+        ttsBridge?.setVoiceChat(true)
+        WindowCompat.getInsetsController(window, webView).hide(WindowInsetsCompat.Type.ime())
+        webView.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        setShellMenuEnabled(false)
+        voiceChat.open(chatId)
+    }
+
+    private fun closeVoiceChat() {
+        val newChat = voiceChat.close()
+        ttsBridge?.setVoiceChat(false)
+        webView.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+        setShellMenuEnabled(true)
+        if (newChat != null) {
+            val route = "/chat/${Uri.encode("websocket:$newChat")}"
+            webView.evaluateJavascript("window.location.hash = ${JSONObject.quote(route)};", null)
+        } else if (ttsEnabled) {
+            checkUrlAndAttach()
+        }
+    }
+
+    private fun startVoiceInput() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            == PackageManager.PERMISSION_GRANTED) {
+            voiceChat.startListening()
+        } else {
+            voicePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
     private fun showAgentManagement(open: Boolean) {
         agentManagement.visibility = if (open) View.VISIBLE else View.GONE
         webView.visibility = if (open) View.INVISIBLE else View.VISIBLE
-        drawerLayout.setDrawerLockMode(
-            if (open) DrawerLayout.LOCK_MODE_LOCKED_CLOSED else DrawerLayout.LOCK_MODE_UNLOCKED,
-            GravityCompat.START
+        setShellMenuEnabled(!open)
+    }
+
+    private fun showShellSettings(open: Boolean) {
+        shellSettings.visibility = if (open) View.VISIBLE else View.GONE
+        webView.visibility = if (open) View.INVISIBLE else View.VISIBLE
+        setShellMenuEnabled(!open)
+    }
+
+    private fun setShellMenuEnabled(enabled: Boolean) {
+        val mode = if (enabled) DrawerLayout.LOCK_MODE_UNLOCKED else DrawerLayout.LOCK_MODE_LOCKED_CLOSED
+        drawerLayout.setDrawerLockMode(mode, navView)
+        updateDrawerGestureArea()
+    }
+
+    private fun updateDrawerGestureArea() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        val width = drawerLayout.width
+        if (width == 0 || drawerLayout.getDrawerLockMode(navView) != DrawerLayout.LOCK_MODE_UNLOCKED) {
+            drawerLayout.systemGestureExclusionRects = emptyList()
+            return
+        }
+
+        val rightInset = ViewCompat.getRootWindowInsets(drawerLayout)
+            ?.getInsets(WindowInsetsCompat.Type.systemGestures())?.right ?: 0
+        val edgeWidth = maxOf(rightInset, (24 * resources.displayMetrics.density).toInt())
+        val edgeHeight = (160 * resources.displayMetrics.density).toInt()
+        // Reserve the upper-right edge for the drawer and leave the rest for Android Back.
+        drawerLayout.systemGestureExclusionRects = listOf(
+            Rect((width - edgeWidth).coerceAtLeast(0), 0, width, minOf(edgeHeight, drawerLayout.height))
         )
     }
 
@@ -196,16 +335,16 @@ class MainActivity : AppCompatActivity() {
     private fun importAgent(source: Uri) {
         if (!exportInProgress.compareAndSet(false, true)) return
         val context = applicationContext
-        exportProgress.value = ExportProgress("1 из 4 · Чтение архива…")
+        exportProgress.value = ExportProgress(R.string.archive_reading)
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 withContext(Dispatchers.IO) {
                     val archive = File.createTempFile("alamp-import-", ".zip", context.cacheDir)
                     try {
                         val input = context.contentResolver.openInputStream(source)
-                            ?: throw IOException("Не удалось открыть выбранный ZIP")
+                            ?: throw IOException("Cannot open selected archive")
                         input.use { stream -> archive.outputStream().use { stream.copyTo(it) } }
-                        exportProgress.value = ExportProgress("2 из 4 · Распаковка и проверка ZIP…")
+                        exportProgress.value = ExportProgress(R.string.archive_unpack)
                         Python.getInstance().getModule("start_gateway").callAttr(
                             "import_agent", context.filesDir.absolutePath, archive.absolutePath, ExportStageReporter()
                         )
@@ -218,10 +357,10 @@ class MainActivity : AppCompatActivity() {
                     ttsClient?.stop()
                     waitForGateway()
                 }
-                Toast.makeText(context, "Данные агента импортированы", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, getString(R.string.archive_imported), Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
-                Log.w("AI-Lamp", "Agent import failed (${e.javaClass.simpleName})")
-                Toast.makeText(context, "Импорт не завершён. Проверь ZIP и свободное место.", Toast.LENGTH_LONG).show()
+                Log.w(getString(R.string.app_name), "Agent import failed (${e.javaClass.simpleName})")
+                Toast.makeText(context, getString(R.string.archive_import_failed), Toast.LENGTH_LONG).show()
             } finally {
                 exportProgress.value = null
                 exportInProgress.set(false)
@@ -231,18 +370,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun chooseExportDestination() {
         if (exportInProgress.get()) {
-            Toast.makeText(this, "Экспорт уже выполняется", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.archive_export_busy), Toast.LENGTH_SHORT).show()
             return
         }
         AlertDialog.Builder(this)
-            .setTitle("Экспорт агента")
-            .setMessage(
-                "ZIP содержит историю, память, промпты и настройки, включая сохранённые ключи API. " +
-                    "Выбери личную папку на устройстве или в облаке. " +
-                    "Во время подготовки снимка чат ненадолго отключится."
-            )
-            .setNegativeButton("Отмена", null)
-            .setPositiveButton("Выбрать место") { _, _ ->
+            .setTitle(getString(R.string.agent_export))
+            .setMessage(R.string.archive_export_confirm)
+            .setNegativeButton(getString(R.string.cancel), null)
+            .setPositiveButton(getString(R.string.archive_choose_destination)) { _, _ ->
                 val date = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
                 exportDestination.launch("AI-Lamp-agent-$date.zip")
             }
@@ -252,7 +387,7 @@ class MainActivity : AppCompatActivity() {
     private fun exportAgent(destination: Uri) {
         if (!exportInProgress.compareAndSet(false, true)) return
         val context = applicationContext
-        exportProgress.value = ExportProgress("Подготовка экспорта…")
+        exportProgress.value = ExportProgress(R.string.archive_preparing)
         CoroutineScope(Dispatchers.Main).launch {
             val message = try {
                 withContext(Dispatchers.IO) {
@@ -261,9 +396,9 @@ class MainActivity : AppCompatActivity() {
                         Python.getInstance().getModule("start_gateway").callAttr(
                             "export_agent", context.filesDir.absolutePath, archive.absolutePath, ExportStageReporter()
                         )
-                        exportProgress.value = ExportProgress("4 из 4 · Запись в выбранное место…", 0)
+                        exportProgress.value = ExportProgress(R.string.archive_writing, 0)
                         val output = context.contentResolver.openOutputStream(destination, "wt")
-                            ?: throw IOException("Не удалось открыть выбранный файл")
+                            ?: throw IOException("Cannot open selected destination")
                         val total = archive.length()
                         var written = 0L
                         output.use { stream ->
@@ -276,20 +411,20 @@ class MainActivity : AppCompatActivity() {
                                     written += count
                                     val percent = (written * 100 / total).toInt()
                                     if (exportProgress.value?.percent != percent) {
-                                        exportProgress.value = ExportProgress("4 из 4 · Запись ZIP · $percent%", percent)
+                                        exportProgress.value = ExportProgress(R.string.archive_writing, percent)
                                     }
                                 }
                             }
-                            exportProgress.value = ExportProgress("4 из 4 · Завершение записи…")
+                            exportProgress.value = ExportProgress(R.string.archive_finishing)
                         }
                     } finally {
                         archive.delete()
                     }
                 }
-                "ZIP передан в выбранное место"
+                getString(R.string.archive_exported)
             } catch (e: Exception) {
-                Log.w("AI-Lamp", "Agent export failed (${e.javaClass.simpleName})")
-                "Экспорт не завершён. Проверь свободное место и доступ к выбранной папке."
+                Log.w(getString(R.string.app_name), "Agent export failed (${e.javaClass.simpleName})")
+                getString(R.string.archive_export_failed)
             } finally {
                 exportProgress.value = null
                 exportInProgress.set(false)
@@ -300,9 +435,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        webView.setKeyboardHidden(
-            VoiceSettings.preferences(this).getBoolean(VoiceSettings.HIDE_WEB_KEYBOARD, false)
-        )
+        val preferences = VoiceSettings.preferences(this)
+        webView.setKeyboardHidden(preferences.getBoolean(VoiceSettings.HIDE_WEB_KEYBOARD, false))
+        val chatZoom = TextSizePreference.WEB_CHAT.read(preferences)
+        if (webView.settings.textZoom != chatZoom) webView.settings.textZoom = chatZoom
+        voiceChat.applyTextSizes()
         val enabled = VoiceSettings.read(this).enabled
         ttsBridge?.reloadSettings()
         if (enabled == ttsEnabled) return
@@ -330,18 +467,14 @@ class MainActivity : AppCompatActivity() {
     private fun setStatus(text: String) {
         tvStatus.text = text
         tvStatus.visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
-        val header = navView.getHeaderView(0)
-        header.findViewById<TextView>(R.id.tv_status_header)?.apply {
-            this.text = text
-            visibility = tvStatus.visibility
-        }
     }
 
     private fun setupWebView() {
         ttsBridge = TtsBridge(this) { isSpeaking ->
             runOnUiThread {
+                if (::voiceChat.isInitialized) voiceChat.onPlaybackChanged(isSpeaking)
                 if (isSpeaking) {
-                    setStatus("🧞 говорит...")
+                    setStatus(getString(R.string.app_speaking))
                 } else {
                     setStatus("")
                 }
@@ -395,7 +528,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
-                if (ttsEnabled && url != null) {
+                if (ttsEnabled && url != null && !voiceChat.isOpen) {
                     val chatId = extractChatId(url)
                     if (chatId != null && chatId != lastChatId) {
                         lastChatId = chatId
@@ -436,7 +569,7 @@ class MainActivity : AppCompatActivity() {
      * Проверяет каждые 2 секунды, максимум 30 попыток (60 секунд).
      * Когда gateway готов — загружает WebUI.
      */
-    private fun waitForGateway() {
+    private fun waitForGateway(page: String = WEBUI_URL) {
         gatewayCheckJob?.cancel()
         gatewayCheckJob = CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             var attempts = 0
@@ -452,8 +585,8 @@ class MainActivity : AppCompatActivity() {
 
                     if (body.contains("\"ready\": true") || body.contains("\"websocket\": \"running\"")) {
                         withContext(Dispatchers.Main) {
-                            setStatus("✅ Загружаю...")
-                            webView.loadUrl("http://localhost:8766/webui/")
+                            setStatus(getString(R.string.app_loading))
+                            webView.loadUrl(page)
                         }
                         return@launch
                     }
@@ -467,8 +600,8 @@ class MainActivity : AppCompatActivity() {
 
             // Таймаут — gateway не запустился
             withContext(Dispatchers.Main) {
-                setStatus("❌ Gateway не запустился")
-                Toast.makeText(this@MainActivity, "Gateway не отвечает после 60с", Toast.LENGTH_LONG).show()
+                setStatus(getString(R.string.gateway_not_started))
+                Toast.makeText(this@MainActivity, getString(R.string.gateway_timeout), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -497,6 +630,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkUrlAndAttach() {
+        if (voiceChat.isOpen) return
         val url = webView.url
         if (url != null) {
             val chatId = extractChatId(url)
@@ -507,19 +641,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showFontSizeDialog() {
-        val sizes = arrayOf("70%", "80%", "90%", "100%", "110%", "120%", "130%", "150%")
-        val values = intArrayOf(70, 80, 90, 100, 110, 120, 130, 150)
-        val currentZoom = webView.settings.textZoom
-        var checkedItem = values.indexOfFirst { it >= currentZoom }.coerceAtLeast(0)
+    private fun isNanobotPage(url: String): Boolean {
+        val uri = Uri.parse(url)
+        return uri.scheme == "http" && uri.host == "localhost" && uri.port == 8766 &&
+            uri.path?.trimEnd('/') == "/webui"
+    }
 
+    private fun chooseAppLanguage() {
+        val current = AppCompatDelegate.getApplicationLocales().get(0)?.language
+        val selected = appLanguages.indexOfFirst { it.first == current } + 1
+        val names = listOf(getString(R.string.app_language_system)) + appLanguages.map { it.second }
         AlertDialog.Builder(this)
-            .setTitle("Размер текста")
-            .setSingleChoiceItems(sizes, checkedItem) { dialog, which ->
-                webView.settings.textZoom = values[which]
+            .setTitle(R.string.app_language)
+            .setSingleChoiceItems(names.toTypedArray(), selected) { dialog, index ->
                 dialog.dismiss()
+                val tag = appLanguages.getOrNull(index - 1)?.first.orEmpty()
+                AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
             }
-            .setNegativeButton("Отмена", null)
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
@@ -532,17 +671,21 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 if (!isDestroyed) {
-                    Toast.makeText(this@MainActivity, "Gateway error: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, getString(R.string.gateway_error), Toast.LENGTH_LONG).show()
                 }
             }
         }
     }
 
     override fun onBackPressed() {
-        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START)
+        if (drawerLayout.isDrawerVisible(navView)) {
+            drawerLayout.closeDrawer(navView)
+        } else if (voiceChat.isOpen) {
+            closeVoiceChat()
         } else if (agentManagement.visibility == View.VISIBLE) {
             showAgentManagement(false)
+        } else if (shellSettings.visibility == View.VISIBLE) {
+            showShellSettings(false)
         } else if (webView.canGoBack()) {
             webView.goBack()
         } else {
@@ -550,14 +693,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        voiceChat.updateAvatarSize()
+    }
+
+    override fun onPause() {
+        voiceChat.pauseRecording()
+        super.onPause()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(MANAGEMENT_OPEN, agentManagement.visibility == View.VISIBLE)
+        outState.putBoolean(SETTINGS_OPEN, shellSettings.visibility == View.VISIBLE)
+        webView.url?.takeIf(::isNanobotPage)?.let { outState.putString(WEBUI_URL_STATE, it) }
     }
 
     override fun onDestroy() {
         gatewayCheckJob?.cancel()
         exportProgressJob?.cancel()
+        voiceChat.destroy()
         ttsClient?.stop()
         ttsBridge?.destroy()
         ttsBridge = null

@@ -3,4 +3,8 @@
     <color name="shell_surface">#EFF3F8</color>
     <color name="shell_accent">#365C83</color>
     <color name="shell_header">#37536F</color>
+    <color name="voice_answer_surface">#F2EDF7</color>
+    <color name="diagnostic_success">#17623B</color>
+    <color name="diagnostic_failure">#A02227</color>
+    <color name="diagnostic_partial">#815600</color>
 </resources>

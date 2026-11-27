@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/shell_settings"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/shell_surface"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layoutDirection="ltr"
+        android:orientation="horizontal"
+        android:paddingLeft="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:accessibilityHeading="true"
+            android:text="@string/shell_settings_title"
+            android:textAppearance="?android:attr/textAppearanceLarge" />
+
+        <ImageButton
+            android:id="@+id/shell_settings_back"
+            style="@style/EditorAction"
+            android:contentDescription="@string/back_to_chat"
+            android:src="@drawable/ic_shell_close" />
+
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="12dp">
+
+            <Button
+                android:id="@+id/shell_settings_language"
+                style="@style/ShellAction"
+                android:drawableStart="@android:drawable/ic_menu_myplaces"
+                android:text="@string/app_language" />
+
+            <Button
+                android:id="@+id/shell_settings_text_size"
+                style="@style/ShellAction"
+                android:drawableStart="@android:drawable/ic_menu_zoom"
+                android:text="@string/shell_text_size" />
+
+            <Button
+                android:id="@+id/shell_settings_stt"
+                style="@style/ShellAction"
+                android:drawableStart="@android:drawable/ic_btn_speak_now"
+                android:text="@string/stt_heading" />
+
+            <Button
+                android:id="@+id/shell_settings_tts"
+                style="@style/ShellAction"
+                android:drawableStart="@android:drawable/ic_lock_silent_mode_off"
+                android:text="@string/tts_heading" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

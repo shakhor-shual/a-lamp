@@ -62,10 +62,12 @@ class AgentEditorActivity : AppCompatActivity() {
         save = findViewById(R.id.editor_save)
         revert = findViewById(R.id.editor_revert)
         restart = findViewById(R.id.editor_restart)
-        heading.text = if (section == CONFIGS) "Конфиги" else "Промпты"
+        heading.text = if (section == CONFIGS) getString(R.string.agent_configs) else getString(R.string.agent_prompts)
         revert.visibility = if (section == CONFIGS) View.VISIBLE else View.GONE
         restart.visibility = revert.visibility
-        listOf(choose, save, revert, restart).forEach { button ->
+        val close = findViewById<ImageButton>(R.id.editor_close)
+        close.setOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        listOf(choose, save, revert, restart, close).forEach { button ->
             TooltipCompat.setTooltipText(button, button.contentDescription)
         }
 
@@ -77,14 +79,14 @@ class AgentEditorActivity : AppCompatActivity() {
         save.setOnClickListener { write("save", editor.text.toString()) }
         revert.setOnClickListener {
             AlertDialog.Builder(this)
-                .setTitle("Восстановить предыдущую версию?")
-                .setMessage("Файл $name будет заменён сохранённой копией .bak.")
-                .setNegativeButton("Отмена", null)
-                .setPositiveButton("Откатить") { _, _ -> write("revert") }
+                .setTitle(getString(R.string.editor_restore_title))
+                .setMessage(getString(R.string.editor_restore_message, name))
+                .setNegativeButton(getString(R.string.cancel), null)
+                .setPositiveButton(getString(R.string.editor_revert)) { _, _ -> write("revert") }
                 .show()
         }
         restart.setOnClickListener {
-            runOperation("Перезапуск шлюза…") {
+            runOperation(getString(R.string.editor_restarting)) {
                 withContext(Dispatchers.IO) {
                     Python.getInstance().getModule("start_gateway")
                         .callAttr("restart_gateway", filesDir.absolutePath)
@@ -119,22 +121,22 @@ class AgentEditorActivity : AppCompatActivity() {
         }
     }
 
-    private fun chooseFile() = runOperation("Чтение списка…") {
+    private fun chooseFile() = runOperation(getString(R.string.editor_listing)) {
         val entries = request("list").getJSONArray("files")
         val files = Array(entries.length()) { entries.getString(it) }
         if (files.isEmpty()) {
-            showStatus("Файлы этого раздела пока недоступны.")
+            showStatus(getString(R.string.editor_no_files))
         } else {
             showStatus("")
             AlertDialog.Builder(this)
-                .setTitle(if (section == CONFIGS) "Конфиги" else "Промпты")
+                .setTitle(if (section == CONFIGS) getString(R.string.agent_configs) else getString(R.string.agent_prompts))
                 .setItems(files) { _, index -> open(files[index]) }
-                .setNegativeButton("Отмена", null)
+                .setNegativeButton(getString(R.string.cancel), null)
                 .show()
         }
     }
 
-    private fun open(file: String) = runOperation("Открытие файла…") {
+    private fun open(file: String) = runOperation(getString(R.string.editor_opening)) {
         val response = request("read", file)
         name = file
         heading.text = file
@@ -144,12 +146,12 @@ class AgentEditorActivity : AppCompatActivity() {
 
     private fun write(operation: String, text: String = "") {
         val file = name ?: return
-        runOperation("Запись файла…") {
+        runOperation(getString(R.string.editor_writing)) {
             display(request(operation, file, revision, text))
             showStatus(when {
-                operation == "revert" -> "Предыдущая версия восстановлена. Перезапусти шлюз, чтобы применить её."
-                section == CONFIGS -> "Сохранено. Перезапусти шлюз, чтобы применить все изменения."
-                else -> "Промпт сохранён."
+                operation == "revert" -> getString(R.string.editor_restored)
+                section == CONFIGS -> getString(R.string.editor_config_saved)
+                else -> getString(R.string.editor_prompt_saved)
             })
         }
     }
@@ -182,15 +184,15 @@ class AgentEditorActivity : AppCompatActivity() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IllegalArgumentException) {
-                val error = e.message ?: "Проверь содержимое файла."
+                val error = e.message ?: getString(R.string.editor_check_file_detail)
                 showStatus(error)
                 AlertDialog.Builder(this@AgentEditorActivity)
-                    .setTitle("Проверь содержимое файла")
+                    .setTitle(getString(R.string.editor_check_file))
                     .setMessage(error)
-                    .setPositiveButton("OK", null)
+                    .setPositiveButton(android.R.string.ok, null)
                     .show()
             } catch (e: Exception) {
-                showStatus("Операция не завершилась. Проверь доступ к файлу и свободное место.")
+                showStatus(getString(R.string.editor_failed))
             } finally {
                 busy = false
                 if (!isDestroyed) updateControls()
@@ -212,7 +214,9 @@ class AgentEditorActivity : AppCompatActivity() {
         save.isEnabled = fileIsOpen && hasChanges()
         revert.isEnabled = fileIsOpen && hasBackup
         restart.isEnabled = !busy && !hasChanges()
-        listOf(choose, save, revert, restart).forEach { button ->
+        val close = findViewById<ImageButton>(R.id.editor_close)
+        close.setOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        listOf(choose, save, revert, restart, close).forEach { button ->
             button.alpha = if (button.isEnabled) 1f else 0.38f
         }
     }
@@ -223,9 +227,9 @@ class AgentEditorActivity : AppCompatActivity() {
             return
         }
         AlertDialog.Builder(this)
-            .setTitle("Отбросить несохранённые изменения?")
-            .setNegativeButton("Остаться", null)
-            .setPositiveButton("Отбросить") { _, _ -> proceed() }
+            .setTitle(getString(R.string.editor_discard_title))
+            .setNegativeButton(getString(R.string.editor_stay), null)
+            .setPositiveButton(getString(R.string.editor_discard)) { _, _ -> proceed() }
             .show()
     }
 

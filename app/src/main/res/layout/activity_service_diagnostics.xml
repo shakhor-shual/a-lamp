@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/shell_surface"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layoutDirection="ltr"
+        android:orientation="horizontal"
+        android:paddingLeft="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:accessibilityHeading="true"
+            android:text="@string/service_diagnostics_title"
+            android:textAppearance="?android:attr/textAppearanceLarge" />
+
+        <ImageButton
+            android:id="@+id/diagnostics_back"
+            style="@style/EditorAction"
+            android:contentDescription="@string/back_to_chat"
+            android:src="@drawable/ic_shell_close" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layoutDirection="ltr"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp">
+
+        <TextView
+            android:id="@+id/diagnostics_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:accessibilityLiveRegion="polite"
+            android:paddingRight="12dp" />
+
+        <ImageButton
+            android:id="@+id/diagnostics_test"
+            style="@style/EditorAction"
+            android:background="@drawable/diagnostic_refresh_background"
+            android:contentDescription="@string/repeat_diagnostics"
+            android:src="@drawable/ic_diagnostic_refresh" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:id="@+id/diagnostics_results"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:showDividers="middle"
+            android:divider="?android:attr/listDivider" />
+    </ScrollView>
+</LinearLayout>

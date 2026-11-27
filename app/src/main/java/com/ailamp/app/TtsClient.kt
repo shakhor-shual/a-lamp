@@ -19,6 +19,7 @@ class TtsClient(
     private var attachedChatId: String? = null
     private var textBuffer = StringBuilder()
     private var currentJob: Job? = null
+    @Volatile private var connectionGeneration = 0
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.SECONDS)
@@ -39,6 +40,7 @@ class TtsClient(
     }
 
     fun stop() {
+        connectionGeneration++
         currentJob?.cancel()
         currentJob = null
         webSocket?.close(1000, "stopped")
@@ -48,6 +50,7 @@ class TtsClient(
     }
 
     private fun connectAndAttach(chatId: String) {
+        val generation = ++connectionGeneration
         currentJob?.cancel()
         val jobScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         currentJob = jobScope.launch {
@@ -72,23 +75,27 @@ class TtsClient(
 
                 wsClient.newWebSocket(request, object : WebSocketListener() {
                     override fun onOpen(webSocket: WebSocket, response: Response) {
+                        if (generation != connectionGeneration) {
+                            webSocket.close(1000, null)
+                            return
+                        }
                         Log.d(TAG, "WebSocket opened")
                         this@TtsClient.webSocket = webSocket
                         sendAttach(chatId)
                     }
 
                     override fun onMessage(webSocket: WebSocket, text: String) {
-                        handleMessage(text)
+                        if (generation == connectionGeneration) handleMessage(text)
                     }
 
                     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                         Log.e(TAG, "WebSocket failure", t)
-                        this@TtsClient.webSocket = null
+                        if (generation == connectionGeneration) this@TtsClient.webSocket = null
                     }
 
                     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                         Log.d(TAG, "WebSocket closed: $code $reason")
-                        this@TtsClient.webSocket = null
+                        if (generation == connectionGeneration) this@TtsClient.webSocket = null
                     }
                 })
 

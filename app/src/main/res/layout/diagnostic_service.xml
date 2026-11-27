@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="12dp">
+
+    <TextView
+        android:id="@+id/diagnostic_service_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/diagnostic_service_url"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textIsSelectable="true" />
+
+    <TextView
+        android:id="@+id/diagnostic_service_result"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/diag_pending"
+        android:textColor="@color/shell_accent" />
+</LinearLayout>

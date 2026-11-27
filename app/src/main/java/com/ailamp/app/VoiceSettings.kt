@@ -24,8 +24,12 @@ internal data class VoiceSettings(
 
     companion object {
         const val HIDE_WEB_KEYBOARD = "hide_web_keyboard"
+        const val RECOGNITION_LANGUAGE = "stt_language"
 
         fun preferences(context: Context) = context.getSharedPreferences("ai-lamp", Context.MODE_PRIVATE)
+
+        fun recognitionLanguage(context: Context): String =
+            preferences(context).getString(RECOGNITION_LANGUAGE, null) ?: read(context).language
 
         fun read(context: Context): VoiceSettings = preferences(context).run {
             VoiceSettings(

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/shell_surface"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:layoutDirection="ltr"
+        android:orientation="horizontal"
+        android:paddingLeft="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:accessibilityHeading="true"
+            android:text="@string/stt_heading"
+            android:textAppearance="?android:attr/textAppearanceLarge" />
+
+        <ImageButton
+            android:id="@+id/stt_back"
+            style="@style/EditorAction"
+            android:contentDescription="@string/back_to_settings"
+            android:src="@drawable/ic_shell_close" />
+
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="12dp"
+            android:paddingBottom="12dp">
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/voice_hide_keyboard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
+                android:paddingHorizontal="12dp"
+                android:text="@string/hide_web_keyboard"
+                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            <Button
+                android:id="@+id/voice_recognition_language"
+                style="@style/ShellAction"
+                android:drawableStart="@android:drawable/ic_menu_myplaces"
+                android:text="@string/stt_language" />
+
+            <Button
+                android:id="@+id/open_voice_chat"
+                style="@style/ShellAction"
+                android:drawableStart="@android:drawable/ic_btn_speak_now"
+                android:text="@string/voice_chat_title" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

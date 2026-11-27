@@ -8,6 +8,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
+        android:layoutDirection="ltr"
         android:orientation="horizontal"
         android:paddingStart="12dp">
 
@@ -24,26 +25,32 @@
         <ImageButton
             android:id="@+id/editor_choose"
             style="@style/EditorAction"
-            android:contentDescription="Выбрать файл"
+            android:contentDescription="@string/editor_pick_file"
             android:src="@android:drawable/ic_menu_agenda" />
 
         <ImageButton
             android:id="@+id/editor_save"
             style="@style/EditorAction"
-            android:contentDescription="Сохранить"
+            android:contentDescription="@string/editor_save"
             android:src="@android:drawable/ic_menu_save" />
 
         <ImageButton
             android:id="@+id/editor_revert"
             style="@style/EditorAction"
-            android:contentDescription="Откатить"
+            android:contentDescription="@string/editor_revert"
             android:src="@android:drawable/ic_menu_revert" />
 
         <ImageButton
             android:id="@+id/editor_restart"
             style="@style/EditorAction"
-            android:contentDescription="Перезапустить шлюз"
+            android:contentDescription="@string/editor_gateway_restart"
             android:src="@android:drawable/ic_popup_sync" />
+
+        <ImageButton
+            android:id="@+id/editor_close"
+            style="@style/EditorAction"
+            android:contentDescription="@string/editor_close"
+            android:src="@drawable/ic_shell_close" />
 
     </LinearLayout>
 

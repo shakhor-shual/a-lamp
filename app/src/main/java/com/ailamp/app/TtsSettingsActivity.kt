@@ -61,14 +61,8 @@ class TtsSettingsActivity : AppCompatActivity() {
                 preferences.edit().putBoolean("tts_enabled", checked).apply()
             }
         }
-        findViewById<SwitchCompat>(R.id.voice_hide_keyboard).apply {
-            isChecked = preferences.getBoolean(VoiceSettings.HIDE_WEB_KEYBOARD, false)
-            setOnCheckedChangeListener { _, checked ->
-                preferences.edit().putBoolean(VoiceSettings.HIDE_WEB_KEYBOARD, checked).apply()
-            }
-        }
-        bindSlider(R.id.voice_rate, R.id.voice_rate_label, "Скорость", "tts_speed", settings.rate, 3, 30)
-        bindSlider(R.id.voice_pitch, R.id.voice_pitch_label, "Высота тона", "tts_pitch", settings.pitch, 5, 20)
+        bindSlider(R.id.voice_rate, R.id.voice_rate_label, getString(R.string.tts_speed), "tts_speed", settings.rate, 3, 30)
+        bindSlider(R.id.voice_pitch, R.id.voice_pitch_label, getString(R.string.tts_pitch), "tts_pitch", settings.pitch, 5, 20)
         engineButton.setOnClickListener { chooseEngine() }
         languageButton.setOnClickListener { chooseLanguage() }
         voiceButton.setOnClickListener { chooseVoice() }
@@ -84,7 +78,7 @@ class TtsSettingsActivity : AppCompatActivity() {
         tts?.shutdown()
         catalogue = catalogue.copy(locales = emptyList(), voices = emptyList())
         render()
-        showStatus("Загружаю доступные голоса…")
+        showStatus(getString(R.string.tts_loading))
         tts = TextToSpeech(this, { result ->
             window.decorView.post {
                 val engine = tts
@@ -99,41 +93,47 @@ class TtsSettingsActivity : AppCompatActivity() {
                                 voices.map { it.locale }
                             val languages = locales.filter { it.language.isNotEmpty() }
                                 .distinctBy { it.toLanguageTag() }
-                                .sortedWith(compareBy(Collator.getInstance()) { it.displayName })
+                                .sortedWith(compareBy(Collator.getInstance(displayLocale)) { it.getDisplayName(displayLocale) })
                             Catalogue(engines, languages, voices, engine.defaultEngine)
                         }
                     } catch (error: CancellationException) {
                         throw error
                     } catch (_: RuntimeException) {
-                        if (current == generation) showStatus("Не удалось получить список голосов.")
+                        if (current == generation) showStatus(getString(R.string.tts_list_failed))
                         return@launch
                     }
                     if (current != generation) return@launch
                     catalogue = loaded
                     ready = available
                     if (ready) watchPreview(engine, current)
-                    showStatus(if (ready) "" else "Движок озвучки не запустился. Выбери другой движок.")
+                    showStatus(if (ready) "" else getString(R.string.tts_engine_failed))
                     render()
                 }
             }
         }, VoiceSettings.read(this).engine)
     }
 
+    private val displayLocale get() = resources.configuration.locales[0]
+
+    private fun localizedLabel(label: Int, value: String) = localizedLabel(getString(label), value)
+
+    private fun localizedLabel(label: String, value: String) = getString(R.string.tts_value_label, label, value)
+
     private fun render() {
         val settings = VoiceSettings.read(this)
         val systemName = catalogue.engines.firstOrNull { it.name == catalogue.defaultEngine }?.label
         val engineName = catalogue.engines.firstOrNull { it.name == settings.engine }?.label
-        val engineLabel = if (settings.engine == null) systemName ?: "Системный"
+        val engineLabel = if (settings.engine == null) systemName ?: getString(R.string.tts_system)
             else engineName ?: settings.engine
-        engineButton.text = "Движок · $engineLabel"
+        engineButton.text = localizedLabel(R.string.tts_engine, engineLabel)
         engineButton.isEnabled = catalogue.engines.isNotEmpty()
 
         val locale = Locale.forLanguageTag(settings.language)
-        languageButton.text = "Язык · ${locale.displayName}"
+        languageButton.text = localizedLabel(R.string.tts_language, locale.getDisplayName(displayLocale))
         languageButton.isEnabled = ready && catalogue.locales.isNotEmpty()
         val availableVoices = voicesFor(settings.language)
         val voice = availableVoices.firstOrNull { it.name == settings.voice }
-        voiceButton.text = "Голос · ${voice?.let(::voiceLabel) ?: "По умолчанию"}"
+        voiceButton.text = localizedLabel(R.string.tts_voice, voice?.let(::voiceLabel) ?: getString(R.string.tts_default))
         voiceButton.isEnabled = ready && availableVoices.isNotEmpty()
         previewButton.isEnabled = ready
         dataButton.isEnabled = ready || catalogue.engines.isNotEmpty()
@@ -142,7 +142,7 @@ class TtsSettingsActivity : AppCompatActivity() {
     private fun chooseEngine() {
         val settings = VoiceSettings.read(this)
         val engines = catalogue.engines
-        choose("Движок озвучки", listOf("Системный движок") + engines.map { it.label },
+        choose(getString(R.string.tts_engine_title), listOf(getString(R.string.tts_system_engine)) + engines.map { it.label },
             engines.indexOfFirst { it.name == settings.engine } + 1) { index ->
             val selected = engines.getOrNull(index - 1)?.name
             if (selected != settings.engine) {
@@ -155,7 +155,7 @@ class TtsSettingsActivity : AppCompatActivity() {
     private fun chooseLanguage() {
         val languages = catalogue.locales
         val settings = VoiceSettings.read(this)
-        choose("Язык озвучки", languages.map { it.displayName },
+        choose(getString(R.string.tts_language_title), languages.map { it.getDisplayName(displayLocale) },
             languages.indexOfFirst { it.toLanguageTag() == settings.language }) { index ->
             val selected = languages[index].toLanguageTag()
             if (selected != settings.language) {
@@ -168,7 +168,7 @@ class TtsSettingsActivity : AppCompatActivity() {
     private fun chooseVoice() {
         val settings = VoiceSettings.read(this)
         val voices = voicesFor(settings.language)
-        choose("Голос", listOf("По умолчанию") + voices.map(::voiceLabel),
+        choose(getString(R.string.tts_voice), listOf(getString(R.string.tts_default)) + voices.map(::voiceLabel),
             voices.indexOfFirst { it.name == settings.voice } + 1) { index ->
             preferences.edit().putString("tts_voice", voices.getOrNull(index - 1)?.name).apply()
             render()
@@ -184,9 +184,9 @@ class TtsSettingsActivity : AppCompatActivity() {
 
     private fun voiceLabel(voice: Voice): String {
         val type = when {
-            voice.isNetworkConnectionRequired -> "через интернет"
-            TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED in voice.features -> "нужно загрузить"
-            else -> "на устройстве"
+            voice.isNetworkConnectionRequired -> getString(R.string.tts_network)
+            TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED in voice.features -> getString(R.string.tts_needs_download)
+            else -> getString(R.string.tts_on_device)
         }
         return "${voice.name} · $type"
     }
@@ -198,7 +198,7 @@ class TtsSettingsActivity : AppCompatActivity() {
                 dialog.dismiss()
                 select(index)
             }
-            .setNegativeButton("Отмена", null)
+            .setNegativeButton(getString(R.string.cancel), null)
             .show()
     }
 
@@ -207,11 +207,11 @@ class TtsSettingsActivity : AppCompatActivity() {
         findViewById<SeekBar>(slider).apply {
             this.max = max - min
             progress = (value * 10).roundToInt() - min
-            caption.text = "$title · %.1f×".format(value)
+            caption.text = localizedLabel(title, String.format(displayLocale, "%.1f×", value))
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                     val updated = (progress + min) / 10f
-                    caption.text = "$title · %.1f×".format(updated)
+                    caption.text = localizedLabel(title, String.format(displayLocale, "%.1f×", updated))
                     if (fromUser) preferences.edit().putFloat(key, updated).apply()
                 }
                 override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
@@ -224,7 +224,7 @@ class TtsSettingsActivity : AppCompatActivity() {
         val engine = tts ?: return
         val settings = VoiceSettings.read(this)
         if (!settings.applyTo(engine)) {
-            showStatus("Этот язык пока недоступен в выбранном движке.")
+            showStatus(getString(R.string.tts_unavailable_language))
             return
         }
         val locale = Locale.forLanguageTag(settings.language)
@@ -239,7 +239,7 @@ class TtsSettingsActivity : AppCompatActivity() {
             else -> "AI-Lamp. ${locale.getDisplayLanguage(locale)}."
         }
         val result = engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "voice-preview")
-        showStatus(if (result == TextToSpeech.SUCCESS) "" else "Не удалось воспроизвести пример.")
+        showStatus(if (result == TextToSpeech.SUCCESS) "" else getString(R.string.tts_preview_failed))
     }
 
     private fun watchPreview(engine: TextToSpeech, current: Int) {
@@ -248,7 +248,7 @@ class TtsSettingsActivity : AppCompatActivity() {
             override fun onDone(utteranceId: String?) = Unit
             override fun onError(utteranceId: String?) {
                 runOnUiThread {
-                    if (current == generation) showStatus("Голос не воспроизвёл пример. Проверь доступ к голосовым данным.")
+                    if (current == generation) showStatus(getString(R.string.tts_preview_data_failed))
                 }
             }
         })
@@ -260,7 +260,7 @@ class TtsSettingsActivity : AppCompatActivity() {
         try {
             voiceData.launch(intent)
         } catch (_: ActivityNotFoundException) {
-            showStatus("Этот движок не открывает загрузку голосов из приложения.")
+            showStatus(getString(R.string.tts_download_unavailable))
         }
     }
 

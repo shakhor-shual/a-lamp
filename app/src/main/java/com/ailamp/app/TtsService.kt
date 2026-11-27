@@ -75,7 +75,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
         isActive = true
         isRunning = true
 
-        val notification = createNotification("🧞 AI-Lamp слушает")
+        val notification = createNotification(getString(R.string.tts_notification_listening))
         startForeground(NOTIFICATION_ID, notification)
 
         connectWebSocket()
@@ -105,7 +105,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.d(TAG, "WebSocket connected")
-                updateNotification("🧞 AI-Lamp подключена")
+                updateNotification(getString(R.string.tts_notification_connected))
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -114,7 +114,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.e(TAG, "WebSocket error: ${t.message}")
-                updateNotification("🧞 Ошибка соединения")
+                updateNotification(getString(R.string.tts_notification_error))
                 // Переподключаемся через 5 секунд
                 scope.launch {
                     delay(5000)
@@ -188,7 +188,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
             @Suppress("DEPRECATION")
             tts.speak(text, TextToSpeech.QUEUE_ADD, null)
         }
-        updateNotification("🧞 AI-Lamp говорит...")
+        updateNotification(getString(R.string.tts_notification_speaking))
     }
 
     override fun onInit(status: Int) {
@@ -210,7 +210,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
                 "AI-Lamp TTS",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Уведомления голосового ассистента"
+                description = getString(R.string.tts_notification_description)
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
@@ -225,7 +225,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
             Notification.Builder(this)
         }
         return builder
-            .setContentTitle("AI-Lamp")
+            .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setOngoing(true)

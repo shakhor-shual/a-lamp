@@ -7,6 +7,9 @@
 
     <queries>
         <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
         <intent>
@@ -18,12 +21,14 @@
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/app_locales"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.AILamp">
 
         <activity
             android:name="com.ailamp.app.MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -41,6 +46,26 @@
             android:name="com.ailamp.app.TtsSettingsActivity"
             android:exported="false"
             android:parentActivityName="com.ailamp.app.MainActivity" />
+
+        <activity
+            android:name=".SttSettingsActivity"
+            android:exported="false"
+            android:parentActivityName="com.ailamp.app.MainActivity" />
+
+        <activity
+            android:name=".TextSizeSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ServiceDiagnosticsActivity"
+            android:exported="false" />
+
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data android:name="autoStoreLocales" android:value="true" />
+        </service>
 
     </application>
 

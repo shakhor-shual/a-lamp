@@ -2,23 +2,28 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/action_voice"
+        android:id="@+id/action_voice_chat"
         android:icon="@android:drawable/ic_btn_speak_now"
-        android:title="@string/voice_settings_title" />
+        android:title="@string/voice_chat_title" />
 
     <item
         android:id="@+id/action_agent_management"
-        android:icon="@android:drawable/ic_menu_manage"
+        android:icon="@drawable/ic_agent_settings"
         android:title="@string/agent_management_title" />
 
     <item
-        android:id="@+id/action_diagnostics"
-        android:icon="@android:drawable/ic_menu_info_details"
-        android:title="Диагностика" />
+        android:id="@+id/action_shell_settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="@string/shell_settings_title" />
 
     <item
-        android:id="@+id/action_font_size"
-        android:icon="@android:drawable/ic_menu_zoom"
-        android:title="Размер текста" />
+        android:id="@+id/action_service_diagnostics"
+        android:icon="@android:drawable/ic_menu_info_details"
+        android:title="@string/service_diagnostics_title" />
+
+    <item
+        android:id="@+id/action_about"
+        android:icon="@android:drawable/ic_dialog_info"
+        android:title="@string/about_title" />
 
 </menu>
